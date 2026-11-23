@@ -5,6 +5,7 @@ import gsap from 'gsap'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { signs, type SignData } from './layout'
 import { getGlowTexture, makeSignTexture } from './textures'
+import { ensureFonts, FONTS } from './fonts'
 import { targetFor, useStore } from '../store'
 
 /* ------------ shared runtime registries (read by lights, picker and UI) ------------ */
@@ -93,6 +94,24 @@ function SignView({ s }: { s: SignData }) {
     }),
     [s, tex, texs, glowTex],
   )
+  // draw the artwork with the shop's own typeface once it has loaded (first paint uses system fallback)
+  useEffect(() => {
+    let alive = true
+    ensureFonts(FONTS[s.fontId], s.brand, s.sub ?? '').then(() => {
+      if (!alive) return
+      const t = makeSignTexture(s)
+      const old = mats.text.map
+      mats.text.map = t.text
+      mats.halo.map = t.halo
+      mats.shadow.map = t.halo
+      mats.text.needsUpdate = true
+      old?.dispose()
+    })
+    return () => {
+      alive = false
+    }
+  }, [s, mats])
+
   const c0 = useMemo(() => new THREE.Color(s.panel0), [s])
   const c1 = useMemo(() => new THREE.Color(s.panel1), [s])
   const t0 = useMemo(() => new THREE.Color(s.text0), [s])

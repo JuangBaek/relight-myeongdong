@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { signs } from '../world/layout'
 import { E_MAX, progress, runtime } from '../world/Sign'
 import { input } from '../world/player'
+import { FONTS } from '../world/fonts'
 
 const IS_TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
 
@@ -160,6 +161,9 @@ function SignPanel() {
         {s.id}
       </Row>
       <Row k="SIGN TYPE">{TYPE_LABEL[s.type]}</Row>
+      <Row k="TYPOGRAPHY · LOGO" desktopOnly>
+        {FONTS[s.fontId].label} · {s.logo} mark
+      </Row>
       <Row k="ORIGINAL CONDITION" desktopOnly>
         {s.hinge ? `Projects ${(s.w).toFixed(1)} m from wall` : `Façade-mounted, ${(s.d0 * 100).toFixed(0)} cm light-box`} · saturated {s.colorName.toLowerCase()} LED · {before}% output
       </Row>

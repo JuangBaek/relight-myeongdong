@@ -1,4 +1,5 @@
 import { mulberry32 } from './rng'
+import type { FontId } from './fonts'
 
 /* ------------------------------------------------------------------ *
  *  Street proportions (approximate, inspired by Myeongdong's pedestrian
@@ -14,7 +15,10 @@ export const FLOOR_H = 3.2
 
 export type Side = -1 | 1
 export type SignType = 'VERTICAL' | 'ROUND' | 'FASCIA' | 'BANNER'
-export type Logo = 'ring' | 'hex' | 'star' | 'diamond' | 'leaf' | 'wave'
+export type Logo =
+  | 'ring' | 'hex' | 'star' | 'diamond' | 'leaf' | 'wave'
+  | 'cup' | 'bowl' | 'mic' | 'crown' | 'moon' | 'drop' | 'heart' | 'sun'
+  | 'bread' | 'glasses' | 'dumpling' | 'chili' | 'flower' | 'bolt'
 export type RGB = [number, number, number]
 export type V3 = [number, number, number]
 
@@ -32,6 +36,10 @@ export interface SignData {
   brand: string
   sub?: string
   logo: Logo
+  fontId: FontId
+  layout: number // artwork composition variant (differs per shop)
+  frame: number // border style variant
+  badge: boolean // logo in a knocked-out badge
   type: SignType
   shape: 'box' | 'disc'
   hinge: boolean // true: projects from wall and swings flat; false: already flush
@@ -70,53 +78,55 @@ export interface Building {
 }
 
 /* ---------------------------- brands (fictional) ---------------------------- */
-const FASCIA_NAMES: [string, string | undefined, Logo][] = [
-  ['달빛 떡볶이', 'TTEOKBOKKI', 'ring'],
-  ['NOVA CAFE', '노바 카페', 'star'],
-  ['루미 코스메틱', 'LUMI COSMETIC', 'diamond'],
-  ['MINT SPA', '족욕 · 마사지', 'leaf'],
-  ['청춘 노래방', 'KARAOKE', 'wave'],
-  ['오후의 베이커리', 'BAKERY', 'hex'],
-  ['하늘 안경원', 'OPTICAL', 'ring'],
-  ['별숲 포차', undefined, 'star'],
-  ['BLOOM NAIL', '블룸 네일', 'leaf'],
-  ['한입 만두', 'DUMPLING', 'hex'],
-  ['블루문 BAR', undefined, 'diamond'],
-  ['오늘 라멘', 'RAMEN', 'wave'],
-  ['PEACH BEAUTY', '피치 뷰티', 'leaf'],
-  ['다온 기념품', 'SOUVENIR', 'star'],
-  ['PIXEL ZONE', '게임존', 'hex'],
-  ['담소 찻집', 'TEA HOUSE', 'ring'],
-  ['금빛 호떡', undefined, 'wave'],
-  ['SEOUL GOODS', '서울 굿즈', 'diamond'],
+// [name, sub-line, logo, typeface] — each shop gets its own identity.
+type NameDef = [string, string | undefined, Logo, FontId]
+const FASCIA_NAMES: NameDef[] = [
+  ['달빛 떡볶이', 'TTEOKBOKKI', 'moon', 'jua'],
+  ['NOVA CAFE', '노바 카페', 'cup', 'orbitron'],
+  ['루미 코스메틱', 'LUMI COSMETIC', 'drop', 'gowun'],
+  ['MINT SPA', '족욕 · 마사지', 'leaf', 'cinzel'],
+  ['청춘 노래방', 'KARAOKE', 'mic', 'blackhan'],
+  ['오후의 베이커리', 'BAKERY', 'bread', 'notoserif'],
+  ['하늘 안경원', 'OPTICAL', 'glasses', 'sunflower'],
+  ['별숲 포차', undefined, 'star', 'penscript'],
+  ['BLOOM NAIL', '블룸 네일', 'flower', 'pacifico'],
+  ['한입 만두', 'DUMPLING', 'dumpling', 'dohyeon'],
+  ['블루문 BAR', undefined, 'moon', 'righteous'],
+  ['오늘 라멘', 'RAMEN', 'bowl', 'yeonsung'],
+  ['PEACH BEAUTY', '피치 뷰티', 'heart', 'playfair'],
+  ['다온 기념품', 'SOUVENIR', 'crown', 'gaegu'],
+  ['PIXEL ZONE', '게임존', 'bolt', 'anton'],
+  ['담소 찻집', 'TEA HOUSE', 'ring', 'gowun'],
+  ['금빛 호떡', undefined, 'sun', 'blackhan'],
+  ['SEOUL GOODS', '서울 굿즈', 'hex', 'bebas'],
 ]
-const VERTICAL_NAMES: [string, string | undefined, Logo][] = [
-  ['이모네 분식', undefined, 'ring'],
-  ['네일아트', 'NAIL', 'leaf'],
-  ['해장국', '24H', 'wave'],
-  ['한방 족욕', undefined, 'leaf'],
-  ['찜닭', 'JJIMDAK', 'hex'],
-  ['헤어살롱', 'HAIR', 'diamond'],
-  ['오락실', 'ARCADE', 'star'],
-  ['마사지', 'MASSAGE', 'ring'],
-  ['호떡집', undefined, 'wave'],
+const VERTICAL_NAMES: NameDef[] = [
+  ['이모네 분식', undefined, 'heart', 'jua'],
+  ['네일아트', 'NAIL', 'flower', 'gaegu'],
+  ['해장국', '24H', 'bowl', 'blackhan'],
+  ['한방 족욕', undefined, 'leaf', 'notoserif'],
+  ['찜닭', 'JJIMDAK', 'chili', 'dohyeon'],
+  ['헤어살롱', 'HAIR', 'crown', 'gowun'],
+  ['오락실', 'ARCADE', 'bolt', 'sunflower'],
+  ['마사지', 'MASSAGE', 'drop', 'yeonsung'],
+  ['호떡집', undefined, 'sun', 'penscript'],
 ]
-const ROUND_NAMES: [string, string | undefined, Logo][] = [
-  ['달 카페', 'CAFE', 'ring'],
-  ['별 사주', undefined, 'star'],
-  ['족욕', 'FOOT SPA', 'leaf'],
-  ['피자 24', undefined, 'hex'],
-  ['한입', 'SNACK', 'diamond'],
+const ROUND_NAMES: NameDef[] = [
+  ['달 카페', 'CAFE', 'cup', 'gowun'],
+  ['별 사주', undefined, 'star', 'yeonsung'],
+  ['족욕', 'FOOT SPA', 'leaf', 'dohyeon'],
+  ['피자 24', undefined, 'sun', 'anton'],
+  ['한입', 'SNACK', 'dumpling', 'jua'],
 ]
-const BANNER_NAMES: [string, string | undefined, Logo][] = [
-  ['몽글 빙수', 'BINGSU', 'ring'],
-  ['루나 뷰티', 'LUNA', 'star'],
-  ['핫 치킨', 'CHICKEN', 'hex'],
-  ['크림 디저트', 'DESSERT', 'leaf'],
-  ['미니 스파', 'SPA', 'wave'],
-  ['토이 월드', 'TOY', 'diamond'],
-  ['스시 하나', 'SUSHI', 'ring'],
-  ['꽃 카페', 'FLOWER', 'leaf'],
+const BANNER_NAMES: NameDef[] = [
+  ['몽글 빙수', 'BINGSU', 'moon', 'jua'],
+  ['루나 뷰티', 'LUNA', 'star', 'notoserif'],
+  ['핫 치킨', 'CHICKEN', 'chili', 'blackhan'],
+  ['크림 디저트', 'DESSERT', 'heart', 'gaegu'],
+  ['미니 스파', 'SPA', 'wave', 'sunflower'],
+  ['토이 월드', 'TOY', 'bolt', 'dohyeon'],
+  ['스시 하나', 'SUSHI', 'ring', 'yeonsung'],
+  ['꽃 카페', 'FLOWER', 'flower', 'penscript'],
 ]
 
 const NEON: [string, string, string][] = [
@@ -162,6 +172,9 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
   const aft = AFTER[(idx * 3 + (kind === 'H' ? 0 : 1)) % AFTER.length]
   const id = `SG-${String(++sid).padStart(2, '0')}`
   const base = {
+    layout: (idx * 7 + 3) % 6,
+    frame: (idx * 5 + 1) % 6,
+    badge: idx % 3 === 1,
     id,
     side,
     wallX,
@@ -177,36 +190,36 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     bandX: 0.24,
   }
   if (kind === 'H') {
-    const [brand, sub, logo] = FASCIA_NAMES[(idx * 5) % FASCIA_NAMES.length]
+    const [brand, sub, logo, fontId] = FASCIA_NAMES[(idx * 5) % FASCIA_NAMES.length]
     const w = Math.min(b.w - 2.9, r(3.2, 4.8))
     const h = r(1.0, 1.5)
     return {
-      ...base, brand, sub, logo, type: 'FASCIA', shape: 'box', hinge: false,
+      ...base, brand, sub, logo, fontId, type: 'FASCIA', shape: 'box', hinge: false,
       w, h, y0: 3.7 + (rng() - 0.5) * 0.7, y1: 3.675, d0: r(0.28, 0.46), d1: 0.06,
       s1: Math.min(1, 0.9 / h), e0: r(1.7, 2.8),
     }
   }
   if (kind === 'V') {
-    const [brand, sub, logo] = VERTICAL_NAMES[(idx * 7) % VERTICAL_NAMES.length]
+    const [brand, sub, logo, fontId] = VERTICAL_NAMES[(idx * 7) % VERTICAL_NAMES.length]
     const h = r(2.6, 5.0)
     return {
-      ...base, brand, sub, logo, type: 'VERTICAL', shape: 'box', hinge: true,
+      ...base, brand, sub, logo, fontId, type: 'VERTICAL', shape: 'box', hinge: true,
       w: r(0.75, 1.05), h, y0: Math.max(h / 2 + 4.5, r(5.2, 8.5)), y1: 5.8, d0: 0.22, d1: 0.06,
       s1: Math.min(1, 2.9 / h), e0: r(2.0, 3.0),
     }
   }
   if (kind === 'R') {
-    const [brand, sub, logo] = ROUND_NAMES[(idx * 3) % ROUND_NAMES.length]
+    const [brand, sub, logo, fontId] = ROUND_NAMES[(idx * 3) % ROUND_NAMES.length]
     const rad = r(0.5, 0.68)
     return {
-      ...base, brand, sub, logo, type: 'ROUND', shape: 'disc', hinge: true,
+      ...base, brand, sub, logo, fontId, type: 'ROUND', shape: 'disc', hinge: true,
       w: rad * 2, h: rad * 2, y0: r(3.9, 5.8), y1: 5.7, d0: 0.16, d1: 0.05, s1: 0.78, e0: r(2.0, 3.0),
     }
   }
-  const [brand, sub, logo] = BANNER_NAMES[(idx * 3 + 1) % BANNER_NAMES.length]
+  const [brand, sub, logo, fontId] = BANNER_NAMES[(idx * 3 + 1) % BANNER_NAMES.length]
   const h = r(4.5, 6.8)
   return {
-    ...base, brand, sub, logo, type: 'BANNER', shape: 'box', hinge: false, bandX: 0.02,
+    ...base, brand, sub, logo, fontId, type: 'BANNER', shape: 'box', hinge: false, bandX: 0.02,
     w: r(1.15, 1.6), h, y0: h / 2 + 4.5 + r(0, 1.2), y1: 5.9, d0: 0.45, d1: 0.06,
     s1: Math.min(1, 3.0 / h), e0: r(2.2, 3.0),
   }

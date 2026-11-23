@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import gsap from 'gsap'
 import { signs } from './world/layout'
-import { flyTo } from './world/player'
+import { flyTo, player } from './world/player'
 
 export type Mode = 'WALK' | 'EDIT'
 export type View = 'live' | 'original' | 'improved'
@@ -90,4 +90,4 @@ export const useStore = create<State>((set, get) => ({
 export const targetFor = (s: State, id: string) =>
   s.view === 'original' ? 0 : s.view === 'improved' ? 1 : s.improved[id] ? 1 : 0
 
-if (typeof window !== 'undefined') (window as unknown as Record<string, unknown>).__relight = { useStore }
+if (typeof window !== 'undefined') (window as unknown as Record<string, unknown>).__relight = { useStore, player }
