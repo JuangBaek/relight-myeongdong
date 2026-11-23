@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-mint: #adffb6;
+  --color-sub: #a5a5a5;
+  --font-sans: 'Inter', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+  outline: none;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-sub);
+}
+
+.glass {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.btn:hover {
+  border-color: var(--color-mint);
+  color: var(--color-mint);
+}
+@media (max-width: 640px) {
+  .btn {
+    font-size: 10px;
+    padding: 9px 11px;
+    letter-spacing: 0.08em;
+  }
+}
+.btn.active {
+  background: var(--color-mint);
+  border-color: var(--color-mint);
+  color: #000;
+  font-weight: 600;
+}
