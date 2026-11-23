@@ -78,9 +78,10 @@ export interface Building {
 }
 
 /* ---------------------------- brands (fictional) ---------------------------- */
-// [name, sub-line, logo, typeface] — each shop gets its own identity.
+// [name, sub-line, logo, typeface] — each shop gets its own identity; every name is used at most once.
 type NameDef = [string, string | undefined, Logo, FontId]
 const FASCIA_NAMES: NameDef[] = [
+  ['금빛 호떡', undefined, 'sun', 'blackhan'],
   ['달빛 떡볶이', 'TTEOKBOKKI', 'moon', 'jua'],
   ['NOVA CAFE', '노바 카페', 'cup', 'orbitron'],
   ['루미 코스메틱', 'LUMI COSMETIC', 'drop', 'gowun'],
@@ -97,19 +98,30 @@ const FASCIA_NAMES: NameDef[] = [
   ['다온 기념품', 'SOUVENIR', 'crown', 'gaegu'],
   ['PIXEL ZONE', '게임존', 'bolt', 'anton'],
   ['담소 찻집', 'TEA HOUSE', 'ring', 'gowun'],
-  ['금빛 호떡', undefined, 'sun', 'blackhan'],
   ['SEOUL GOODS', '서울 굿즈', 'hex', 'bebas'],
+  // extra shops with different moods, so no name ever has to repeat
+  ['모아 문구점', 'STATIONERY', 'diamond', 'gaegu'],
+  ['SUNDAY BRUNCH', '선데이 브런치', 'sun', 'playfair'],
+  ['고래 아이스크림', 'ICE CREAM', 'drop', 'jua'],
+  ['NEON LAB', '네온 랩', 'bolt', 'orbitron'],
+  ['은하 반점', 'CHINESE', 'ring', 'yeonsung'],
+  ['VINTAGE FILM', '빈티지 필름', 'hex', 'cinzel'],
+  ['숲속 생과일', 'JUICE BAR', 'leaf', 'sunflower'],
+  ['TOKYO TOAST', '도쿄 토스트', 'bread', 'righteous'],
 ]
 const VERTICAL_NAMES: NameDef[] = [
   ['이모네 분식', undefined, 'heart', 'jua'],
   ['네일아트', 'NAIL', 'flower', 'gaegu'],
-  ['해장국', '24H', 'bowl', 'blackhan'],
+  ['해장국', '24H', 'bowl', 'yeonsung'],
   ['한방 족욕', undefined, 'leaf', 'notoserif'],
   ['찜닭', 'JJIMDAK', 'chili', 'dohyeon'],
   ['헤어살롱', 'HAIR', 'crown', 'gowun'],
   ['오락실', 'ARCADE', 'bolt', 'sunflower'],
   ['마사지', 'MASSAGE', 'drop', 'yeonsung'],
   ['호떡집', undefined, 'sun', 'penscript'],
+  ['달콤 와플', 'WAFFLE', 'hex', 'jua'],
+  ['포토 스튜디오', 'PHOTO', 'glasses', 'dohyeon'],
+  ['레코드 샵', 'RECORDS', 'ring', 'sunflower'],
 ]
 const ROUND_NAMES: NameDef[] = [
   ['달 카페', 'CAFE', 'cup', 'gowun'],
@@ -117,17 +129,53 @@ const ROUND_NAMES: NameDef[] = [
   ['족욕', 'FOOT SPA', 'leaf', 'dohyeon'],
   ['피자 24', undefined, 'sun', 'anton'],
   ['한입', 'SNACK', 'dumpling', 'jua'],
+  ['귤 카페', 'TANGERINE', 'leaf', 'pacifico'],
+  ['호호 분식', 'HOHO', 'heart', 'gaegu'],
+  ['밤 산책', 'NIGHT WALK', 'moon', 'notoserif'],
 ]
 const BANNER_NAMES: NameDef[] = [
-  ['몽글 빙수', 'BINGSU', 'moon', 'jua'],
+  ['몽글 빙수', 'BINGSU', 'diamond', 'jua'],
   ['루나 뷰티', 'LUNA', 'star', 'notoserif'],
-  ['핫 치킨', 'CHICKEN', 'chili', 'blackhan'],
+  ['핫 치킨', 'CHICKEN', 'chili', 'sunflower'],
   ['크림 디저트', 'DESSERT', 'heart', 'gaegu'],
   ['미니 스파', 'SPA', 'wave', 'sunflower'],
   ['토이 월드', 'TOY', 'bolt', 'dohyeon'],
   ['스시 하나', 'SUSHI', 'ring', 'yeonsung'],
   ['꽃 카페', 'FLOWER', 'flower', 'penscript'],
+  ['달다 마카롱', 'MACARON', 'heart', 'gowun'],
+  ['한밤 치킨', 'NIGHT BITE', 'chili', 'yeonsung'],
 ]
+
+/**
+ * Pick a shop identity: never reuse a name, and prefer a typeface / logo that is not already
+ * used by another sign within ~16 m (either side of the street), so neighbours never look alike.
+ */
+const usedNames = new Set<string>()
+const placed: { z: number; font: FontId; logo: Logo }[] = []
+let pickCounter = 0
+function pickName(table: NameDef[], zc: number, originals: number): NameDef {
+  const pool = table.filter((n) => !usedNames.has(n[0]))
+  const list = pool.length ? pool : table
+  const near = placed.filter((p) => Math.abs(p.z - zc) < 16)
+  pickCounter++
+  let best = list[0]
+  let bestScore = Infinity
+  for (const n of list) {
+    // original shops are preferred; the extra shops only step in when an original would clash with a neighbour
+    const score =
+      (near.some((p) => p.font === n[3]) ? 2 : 0) +
+      (near.some((p) => p.logo === n[2] && Math.abs(p.z - zc) < 9) ? 1 : 0) +
+      (table.indexOf(n) >= originals ? 0.5 : 0)
+    if (score < bestScore) {
+      best = n
+      bestScore = score
+      if (score === 0) break
+    }
+  }
+  usedNames.add(best[0])
+  placed.push({ z: zc, font: best[3], logo: best[2] })
+  return best
+}
 
 const NEON: [string, string, string][] = [
   ['#ff2d95', '#ffffff', 'MAGENTA'],
@@ -190,7 +238,7 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     bandX: 0.24,
   }
   if (kind === 'H') {
-    const [brand, sub, logo, fontId] = FASCIA_NAMES[(idx * 5) % FASCIA_NAMES.length]
+    const [brand, sub, logo, fontId] = pickName(FASCIA_NAMES, zc, 18)
     const w = Math.min(b.w - 2.9, r(3.2, 4.8))
     const h = r(1.0, 1.5)
     return {
@@ -200,7 +248,7 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     }
   }
   if (kind === 'V') {
-    const [brand, sub, logo, fontId] = VERTICAL_NAMES[(idx * 7) % VERTICAL_NAMES.length]
+    const [brand, sub, logo, fontId] = pickName(VERTICAL_NAMES, zc, 9)
     const h = r(2.6, 5.0)
     return {
       ...base, brand, sub, logo, fontId, type: 'VERTICAL', shape: 'box', hinge: true,
@@ -209,14 +257,14 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     }
   }
   if (kind === 'R') {
-    const [brand, sub, logo, fontId] = ROUND_NAMES[(idx * 3) % ROUND_NAMES.length]
+    const [brand, sub, logo, fontId] = pickName(ROUND_NAMES, zc, 5)
     const rad = r(0.5, 0.68)
     return {
       ...base, brand, sub, logo, fontId, type: 'ROUND', shape: 'disc', hinge: true,
       w: rad * 2, h: rad * 2, y0: r(3.9, 5.8), y1: 5.7, d0: 0.16, d1: 0.05, s1: 0.78, e0: r(2.0, 3.0),
     }
   }
-  const [brand, sub, logo, fontId] = BANNER_NAMES[(idx * 3 + 1) % BANNER_NAMES.length]
+  const [brand, sub, logo, fontId] = pickName(BANNER_NAMES, zc, 8)
   const h = r(4.5, 6.8)
   return {
     ...base, brand, sub, logo, fontId, type: 'BANNER', shape: 'box', hinge: false, bandX: 0.02,
