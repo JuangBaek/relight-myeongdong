@@ -87,10 +87,10 @@ const TYPE_LABEL = {
 } as const
 
 const STRATEGY = {
-  VERTICAL: 'Rotate the projecting sign to lie parallel to the façade, align to the common sign band, mute the LED.',
-  ROUND: 'Swing the round sign flat against the wall, reduce diameter, switch to low-glare monochrome.',
-  FASCIA: 'Keep on the fascia line; unify band colour, limit lighting to lettering, reduce depth.',
-  BANNER: 'Flatten the LED box onto the façade, cap height to the sign band, replace saturated colour with grey.',
+  VERTICAL: 'Rotate the projecting sign flat to the façade, align to the common sign band, replace the saturated LED with an even white light block + black lettering.',
+  ROUND: 'Swing the round sign flat against the wall, reduce diameter, switch to a soft white light block with black lettering.',
+  FASCIA: 'Keep on the fascia line; unify to a white light block with black lettering, reduce depth and glare.',
+  BANNER: 'Flatten the LED box onto the façade, cap height to the sign band, even white backlight with black lettering.',
 } as const
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {

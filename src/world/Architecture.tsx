@@ -1,5 +1,6 @@
 import { arch } from './layout'
 import { Batch } from './Batch'
+import { ceilMat, interiorMat, shelfMat } from './Lights'
 
 export function Architecture() {
   return (
@@ -26,13 +27,13 @@ export function Architecture() {
 
       {/* lit shop interiors seen through glazing */}
       <Batch items={arch.interiors}>
-        <meshBasicMaterial side={1} toneMapped={false} />
+        <primitive object={interiorMat} attach="material" />
       </Batch>
       <Batch items={arch.shelves}>
-        <meshBasicMaterial toneMapped={false} />
+        <primitive object={shelfMat} attach="material" />
       </Batch>
       <Batch items={arch.ceilingLights}>
-        <meshBasicMaterial toneMapped={false} />
+        <primitive object={ceilMat} attach="material" />
       </Batch>
       <Batch items={arch.glass}>
         <meshPhysicalMaterial color="#9fb4c4" transparent opacity={0.12} roughness={0.05} metalness={0.2} depthWrite={false} />

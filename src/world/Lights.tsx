@@ -19,6 +19,11 @@ export const lampGlowMat = new THREE.MeshBasicMaterial({
   map: getGlowTexture(),
 })
 
+/** Shared shop-interior materials: brighten as the street is improved so shops feel open for business. */
+export const interiorMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide, toneMapped: false })
+export const shelfMat = new THREE.MeshBasicMaterial({ toneMapped: false })
+export const ceilMat = new THREE.MeshBasicMaterial({ toneMapped: false })
+
 /** Global frac of the street that has been improved (0..1), updated every frame. */
 export const street = { frac: 0 }
 
@@ -29,6 +34,7 @@ export function Lighting() {
   const gl = useThree((s) => s.gl)
   const camera = useThree((s) => s.camera)
   const hemi = useRef<THREE.HemisphereLight>(null!)
+  const dir = useRef<THREE.DirectionalLight>(null!)
   const bloom = useRef<{ intensity: number } | null>(null)
   const lights = useRef<(THREE.PointLight | null)[]>([])
   const cands = useRef<{ id: string; d: number }[]>(signs.map((s) => ({ id: s.id, d: 0 })))
@@ -54,8 +60,19 @@ export function Lighting() {
     const f = sum / signs.length
     street.frac = f
 
-    hemi.current.intensity = 0.4 + 0.55 * f // calmer, more even ambient as the street resolves
-    lampGlowMat.opacity = 0.16 + 0.34 * f
+    hemi.current.intensity = 0.4 + 0.5 * f // even, comfortable ambient as the street resolves
+    lampGlowMat.opacity = 0.16 + 0.4 * f
+    scene.environmentIntensity = 0.1 + 0.12 * f
+    dir.current.intensity = 0.12 + 0.2 * f
+    interiorMat.color.setScalar(1 + 3.2 * f) // shops light up
+    shelfMat.color.setScalar(1 + 1.6 * f)
+    ceilMat.color.setScalar(1 + 0.3 * f)
+    const fog = scene.fog as THREE.FogExp2 | null
+    if (fog && scene.background instanceof THREE.Color) {
+      fog.density = THREE.MathUtils.lerp(0.017, 0.013, f)
+      fog.color.setRGB(0.027 + 0.012 * f, 0.031 + 0.014 * f, 0.055 + 0.02 * f) // sky stays night-dark
+      scene.background.copy(fog.color)
+    }
     if (bloom.current) bloom.current.intensity = THREE.MathUtils.lerp(1.15, 0.85, f) // less glare, but neon keeps its glow
 
     // nearest-N signs drive real point lights
@@ -75,7 +92,7 @@ export function Lighting() {
   return (
     <>
       <hemisphereLight ref={hemi} args={['#6b7aa8', '#1a1713', 0.4]} />
-      <directionalLight position={[10, 40, 10]} intensity={0.12} color="#8fa0d0" />
+      <directionalLight ref={dir} position={[10, 40, 10]} intensity={0.12} color="#c8d4f0" />
       {Array.from({ length: POOL }, (_, i) => (
         <pointLight key={i} ref={(el) => void (lights.current[i] = el)} distance={16} decay={2} intensity={0} />
       ))}

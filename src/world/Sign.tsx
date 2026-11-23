@@ -35,12 +35,12 @@ const tmpA = new THREE.Color()
 const tmpB = new THREE.Color()
 const tmpC = new THREE.Color()
 // spill on walls/pavement/lights: one shared pale mint-white so the street doesn't turn green
-const neonTone = new THREE.Color('#E4FFE9')
+const neonTone = new THREE.Color('#FFF8EC') // soft white (slightly warm) spill
 
 /** Thin neon-tube frame (single merged mesh) inset from the panel rim. */
 function makeFrameGeo(s: SignData) {
-  const inset = 0.055
-  const t = 0.034
+  const inset = 0 // tube sits on the rim: half over the white block, half against the dark wall
+  const t = 0.04
   if (s.shape === 'disc') return new THREE.TorusGeometry(s.w / 2 - inset, t / 2, 8, 72)
   const hw = s.w / 2 - inset
   const hh = s.h / 2 - inset
@@ -178,16 +178,8 @@ function SignView({ s }: { s: SignData }) {
     haloF.current.position.set(offX, 0, fz + 0.0055)
     haloF.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
     frameF.current.position.set(offX, 0, fz + 0.016)
-    if (s.hinge) {
-      haloB.current.visible = true
-      haloB.current.position.set(offX, 0, pz - d / 2 - 0.0055)
-      haloB.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
-      frameB.current.visible = true
-      frameB.current.position.set(offX, 0, pz - d / 2 - 0.016)
-    } else {
-      haloB.current.visible = false
-      frameB.current.visible = false
-    }
+    if (s.hinge) frameB.current.position.set(offX, 0, pz - d / 2 - 0.016)
+    else frameB.current.visible = false
 
     // bracket arm for projecting signs
     if (s.hinge) {
@@ -206,30 +198,29 @@ function SignView({ s }: { s: SignData }) {
     mats.text.color.copy(tmpB)
 
     // neon layers fade in with the improvement (colour phase)
-    mats.halo.color.copy(mint).multiplyScalar(1.5)
-    mats.halo.opacity = 0.85 * pc
-    mats.shadow.opacity = 0.5 * pc
-    mats.frame.color.copy(mint).multiplyScalar(2.6 * (0.45 + 0.55 * pc))
+    // black lettering on a white light block needs no halo/shadow; the mint neon rim stays
+    mats.frame.color.copy(mint).multiplyScalar(2.8 * (0.45 + 0.55 * pc))
     const showFrame = pc > 0.02
     frameF.current.visible = showFrame
     if (s.hinge) frameB.current.visible = showFrame
-    haloF.current.visible = showFrame
-    shadowF.current.visible = showFrame
+    haloF.current.visible = false
+    haloB.current.visible = false
+    shadowF.current.visible = false
 
     // runtime for lights / UI
     const power = e / E_MAX
     rt.power = power
-    rt.lightPower = THREE.MathUtils.lerp(power, 0.34, pc) // neon keeps a soft glow on the street
+    rt.lightPower = THREE.MathUtils.lerp(power, 0.5, pc) // white light blocks still light the street
     rt.swing = pm
     rt.color.lerpColors(tmpA, neonTone, pc)
     rt.hex = '#' + tmpA.getHexString()
     // world-space panel centre (pushed slightly toward the street)
     const cx = g.position.x + Math.cos(yaw) * offX * sc
     const cz = g.position.z - Math.sin(yaw) * offX * sc
-    rt.center.set(cx + s.dir * 0.6, y, cz)
+    rt.center.set(cx + s.dir * 1.9, y - 0.4, cz) // lamp stands off the wall so it lights the street, not its own panel
 
     // spill light on façade + pavement (follows emission)
-    const spill = THREE.MathUtils.lerp(1, 0.3, pc)
+    const spill = THREE.MathUtils.lerp(1, 0.75, pc)
     const wg = wallGlow.current
     wg.position.set(s.wallX + s.dir * 0.3, y, cz)
     const wsize = Math.max(s.w, s.h) * sc * 1.5 + 2.2
