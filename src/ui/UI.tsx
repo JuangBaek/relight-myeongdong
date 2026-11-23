@@ -93,11 +93,12 @@ const STRATEGY = {
   BANNER: 'Flatten the LED box onto the façade, cap height to the sign band, even white backlight with black lettering.',
 } as const
 
-function Row({ k, children }: { k: string; children: React.ReactNode }) {
+// `desktopOnly` rows are hidden on phones so the info window stays small
+function Row({ k, children, desktopOnly }: { k: string; children: React.ReactNode; desktopOnly?: boolean }) {
   return (
-    <div className="py-2 border-t border-white/10">
-      <div className="label mb-1">{k}</div>
-      <div className="text-[13px] leading-snug text-white">{children}</div>
+    <div className={`py-1 sm:py-2 border-t border-white/10 ${desktopOnly ? 'hidden sm:block' : ''}`}>
+      <div className="label mb-0.5 sm:mb-1 !text-[8px] sm:!text-[10px]">{k}</div>
+      <div className="text-[11px] sm:text-[13px] leading-snug text-white">{children}</div>
     </div>
   )
 }
@@ -139,21 +140,32 @@ function SignPanel() {
         ? 'WALL-MOUNTED · PARALLEL'
         : `ROTATING ${Math.round(rt.swing * 90)}° / 90°`
   return (
-    <div className="glass p-3 sm:p-4 w-[230px] sm:w-[270px] max-h-[48vh] sm:max-h-none overflow-y-auto">
-      <div className="flex items-center justify-between mb-2">
-        <div className="label">SELECTED SIGN</div>
-        <div className="label" style={{ color: p > 0.98 ? '#ADFFB6' : '#A5A5A5' }}>
+    <div className="glass p-2 sm:p-4 w-[158px] sm:w-[270px] max-h-[32vh] sm:max-h-none overflow-y-auto">
+      <div className="flex items-center justify-between gap-1 mb-1 sm:mb-2">
+        <div className="label !text-[8px] sm:!text-[10px]" style={{ color: p > 0.98 ? '#ADFFB6' : '#A5A5A5' }}>
           {p > 0.98 ? 'IMPROVED' : p < 0.02 ? 'ORIGINAL' : 'TRANSITION'}
         </div>
+        <button
+          className="text-sub hover:text-white text-[14px] leading-none px-1 sm:hidden"
+          aria-label="close"
+          onClick={() => useStore.setState({ selectedId: null })}
+        >
+          ×
+        </button>
+        <div className="label hidden sm:block">SELECTED SIGN</div>
       </div>
-      <div className="text-[22px] font-semibold tracking-tight mb-1">{s.brand}</div>
-      <div className="font-mono text-[11px] text-sub mb-2">{s.id}</div>
-      <Row k="SIGN ID">{s.id}</Row>
+      <div className="text-[14px] sm:text-[22px] font-semibold tracking-tight sm:mb-1">{s.brand}</div>
+      <div className="font-mono text-[9px] sm:text-[11px] text-sub mb-1 sm:mb-2">{s.id}</div>
+      <Row k="SIGN ID" desktopOnly>
+        {s.id}
+      </Row>
       <Row k="SIGN TYPE">{TYPE_LABEL[s.type]}</Row>
-      <Row k="ORIGINAL CONDITION">
+      <Row k="ORIGINAL CONDITION" desktopOnly>
         {s.hinge ? `Projects ${(s.w).toFixed(1)} m from wall` : `Façade-mounted, ${(s.d0 * 100).toFixed(0)} cm light-box`} · saturated {s.colorName.toLowerCase()} LED · {before}% output
       </Row>
-      <Row k="IMPROVEMENT STRATEGY">{STRATEGY[s.type]}</Row>
+      <Row k="IMPROVEMENT STRATEGY" desktopOnly>
+        {STRATEGY[s.type]}
+      </Row>
       <Row k="LIGHTING INTENSITY">
         <div className="flex items-center gap-2">
           <div className="flex-1 h-[3px] bg-white/15 relative">
@@ -164,7 +176,7 @@ function SignPanel() {
           </span>
         </div>
       </Row>
-      <Row k="SIGNAGE COLOR">
+      <Row k="SIGNAGE COLOR" desktopOnly>
         <div className="flex items-center gap-2">
           <span className="inline-block w-4 h-4 border border-white/30" style={{ background: rt.hex }} />
           <span className="font-mono text-[11px]">{rt.hex.toUpperCase()}</span>
@@ -175,7 +187,7 @@ function SignPanel() {
         <span className="font-mono text-[11px]">{mount}</span>
       </Row>
       {id === s.id && p > 0.5 && (
-        <button className="btn w-full mt-2" onClick={() => revert(s.id)}>
+        <button className="btn w-full mt-1 sm:mt-2 !py-1.5 sm:!py-2.5" onClick={() => revert(s.id)}>
           REVERT THIS SIGN
         </button>
       )}
@@ -286,7 +298,7 @@ export function UI() {
       </div>
 
       {/* bottom controls */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-2 flex-wrap justify-center px-3">
+      <div className="absolute bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 sm:gap-2 flex-nowrap sm:flex-wrap justify-center px-2 sm:px-3 w-full sm:w-auto">
         <button className={`btn ${view === 'original' ? 'active' : ''}`} onClick={() => setView('original')}>
           ORIGINAL
         </button>
@@ -301,7 +313,7 @@ export function UI() {
         </button>
       </div>
 
-      <div className="absolute bottom-2 right-4 z-10 pointer-events-none font-mono text-[9px] tracking-wider text-sub/60 text-right">
+      <div className="absolute bottom-2 right-4 z-10 pointer-events-none font-mono text-[9px] tracking-wider text-sub/60 text-right hidden sm:block">
         Design visualization only · not a digital twin · fictional shops · not a luminance/illuminance measurement
       </div>
     </>

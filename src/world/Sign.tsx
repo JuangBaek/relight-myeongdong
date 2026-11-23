@@ -199,7 +199,7 @@ function SignView({ s }: { s: SignData }) {
 
     // neon layers fade in with the improvement (colour phase)
     // black lettering on a white light block needs no halo/shadow; the mint neon rim stays
-    mats.frame.color.copy(mint).multiplyScalar(2.8 * (0.45 + 0.55 * pc))
+    mats.frame.color.copy(mint).multiplyScalar(1.75 * (0.45 + 0.55 * pc)) // softer neon rim
     const showFrame = pc > 0.02
     frameF.current.visible = showFrame
     if (s.hinge) frameB.current.visible = showFrame

@@ -134,11 +134,11 @@ const NEON: [string, string, string][] = [
 // Glowing white light-blocks with black lettering (backlit neon-white panels) + mint rim.
 // Panel emissive is >1 so the block blooms like a lit lightbox, at a calm and even level.
 const AFTER: { panel: string; text: string; e: number; name: string }[] = [
-  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.7, name: 'WHITE LIGHT BLOCK' },
-  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.65, name: 'WHITE LIGHT BLOCK' },
-  { panel: '#E8E3D8', text: '#0e0e0e', e: 0.75, name: 'IVORY LIGHT BLOCK' },
-  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.7, name: 'WHITE LIGHT BLOCK' },
-  { panel: '#E8E3D8', text: '#0e0e0e', e: 0.75, name: 'IVORY LIGHT BLOCK' },
+  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.55, name: 'WHITE LIGHT BLOCK' },
+  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.5, name: 'WHITE LIGHT BLOCK' },
+  { panel: '#E8E3D8', text: '#0e0e0e', e: 0.6, name: 'IVORY LIGHT BLOCK' },
+  { panel: '#F2F2F2', text: '#0e0e0e', e: 0.55, name: 'WHITE LIGHT BLOCK' },
+  { panel: '#E8E3D8', text: '#0e0e0e', e: 0.6, name: 'IVORY LIGHT BLOCK' },
 ]
 
 const WALLS = ['#cfc8bd', '#b9b2a6', '#8c8379', '#d9d4c9', '#7a5a4a', '#5b5f66', '#a39384', '#e0dccf', '#9a8f86', '#6f7378']

@@ -44,8 +44,8 @@ export function Lighting() {
     const env = pm.fromScene(new RoomEnvironment(), 0.04).texture
     scene.environment = env
     scene.environmentIntensity = 0.1
-    scene.background = new THREE.Color('#05060b')
-    scene.fog = new THREE.FogExp2('#07080e', 0.017)
+    scene.background = new THREE.Color('#040509')
+    scene.fog = new THREE.FogExp2('#05060a', 0.017)
     return () => {
       scene.environment = null
       env.dispose()
@@ -70,10 +70,10 @@ export function Lighting() {
     const fog = scene.fog as THREE.FogExp2 | null
     if (fog && scene.background instanceof THREE.Color) {
       fog.density = THREE.MathUtils.lerp(0.017, 0.013, f)
-      fog.color.setRGB(0.027 + 0.012 * f, 0.031 + 0.014 * f, 0.055 + 0.02 * f) // sky stays night-dark
+      fog.color.setRGB(0.02 + 0.005 * f, 0.023 + 0.006 * f, 0.043 + 0.01 * f) // sky stays deep night
       scene.background.copy(fog.color)
     }
-    if (bloom.current) bloom.current.intensity = THREE.MathUtils.lerp(1.15, 0.85, f) // less glare, but neon keeps its glow
+    if (bloom.current) bloom.current.intensity = THREE.MathUtils.lerp(1.15, 0.7, f) // less glare, neon keeps a gentle glow
 
     // nearest-N signs drive real point lights
     const c = cands.current
