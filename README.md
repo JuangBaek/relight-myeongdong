@@ -31,3 +31,14 @@ Node.js 18+ 필요 (WebGL2 지원 브라우저 권장, 데스크톱 Chrome/Edge)
 - 명동 상업거리의 분위기를 참고한 **근사적 3D 모델**이며 실제 거리의 디지털 트윈이 아닙니다.
 - 상점 이름·로고는 모두 가상입니다.
 - 디자인 대안 시각화 도구이며, 법규상 휘도(cd/m²)·조도(lx) 측정값을 재현하지 않습니다.
+
+## 3D 디테일 업그레이드 (v2)
+- **간판 타이포그래피:** 서체 28종(한글 고딕·좁은 고딕·붓글씨·손글씨·세리프, 영문 콘덴스드·스크립트, 일본어 고딕·명조, 중국어 고딕·서예). 일본어/중국어/한글/영문이 섞인 간판, 세로 간판은 글자 세우기 / 90° 눕히기 / 일본어 세로쓰기(tategaki) 3방식으로 구분.
+- **교체 가능한 브랜드 에셋:** `src/world/brandAssets.ts`에 상점명→PNG/SVG 경로를 넣으면 해당 간판의 로고만 교체 (알파 채널을 마스크로 사용). 기본은 직접 그린 벡터 로고 20종. **모든 상점 이름은 가상**이며 실제 브랜드 로고를 사용하지 않음.
+- **간판 본체:** 두께, 금속 프레임(5가지 마감), 모서리 체결부, 돌출 간판 지지대·벽판, 클리어코트 아크릴 면, 입체 글자 릴리프, 벽면 접촉 그림자.
+- **보행자:** 관절 구조의 절차적 인체(외부 모델 없음), 인체 비례·얼굴·머리 5종·겨울 외투 5종·스커트·머플러·가방 3종, 걷기 사이클, 정지·고개 돌리기·쇼윈도 앞 멈춤·2~3인 그룹, 사람/기둥/카메라 회피, 원거리 LOD.
+- **건축:** 벽돌·타일·금속 패널·콘크리트·스투코 5종 재질, 에어컨 실외기, 배관, 거리 횡단 전선.
+
+## 사용 자산 및 라이선스
+- 서체: Google Fonts (SIL Open Font License 1.1) — Noto Sans KR/JP/TC, Noto Serif KR, Black Han Sans, Do Hyeon, Jua, Gowun Batang, Nanum Pen Script, Nanum Brush Script, East Sea Dokdo, Gaegu, Sunflower, Yeon Sung, Gothic A1, Dela Gothic One, Yuji Syuku, Ma Shan Zheng, Bebas Neue, Anton, Oswald, Bungee, Orbitron, Righteous, Pacifico, Lobster, Playfair Display, Cinzel. 실행 시 Google Fonts CDN에서 불러옴.
+- 3D 모델/텍스처 파일: 없음 (모든 지오메트리·텍스처는 코드로 생성).

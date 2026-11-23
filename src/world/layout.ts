@@ -1,5 +1,6 @@
 import { mulberry32 } from './rng'
-import type { FontId } from './fonts'
+import { scriptOf, type FontId } from './fonts'
+import { BRAND_LOGOS } from './brandAssets'
 
 /* ------------------------------------------------------------------ *
  *  Street proportions (approximate, inspired by Myeongdong's pedestrian
@@ -29,6 +30,7 @@ export interface Inst {
   rx?: number
   rz?: number
   c?: string | number | RGB
+  uv?: [number, number] // texture tiling for textured walls (per instance)
 }
 
 export interface SignData {
@@ -40,6 +42,10 @@ export interface SignData {
   layout: number // artwork composition variant (differs per shop)
   frame: number // border style variant
   badge: boolean // logo in a knocked-out badge
+  vert: 'stack' | 'rotate' | 'tategaki' // vertical signs: upright stacked chars, 90°-rotated line, or Japanese tategaki columns
+  metal: number // frame finish (0 black, 1 graphite, 2 aluminium, 3 bronze, 4 champagne)
+  chan: boolean // raised channel-letter relief
+  logoUrl?: string // optional brand artwork (PNG/SVG alpha mask) – see brandAssets.ts
   type: SignType
   shape: 'box' | 'disc'
   hinge: boolean // true: projects from wall and swings flat; false: already flush
@@ -78,10 +84,11 @@ export interface Building {
 }
 
 /* ---------------------------- brands (fictional) ---------------------------- */
-// [name, sub-line, logo, typeface] — each shop gets its own identity; every name is used at most once.
-type NameDef = [string, string | undefined, Logo, FontId]
+// [name, sub-line, logo, typeface, vertical-mode?] — every shop name here is fictional.
+// Signs mix Korean / English / Japanese / Chinese like real tourist streets. Each name is used at most once.
+type Vert = 'stack' | 'rotate' | 'tategaki'
+type NameDef = [string, string | undefined, Logo, FontId, Vert?]
 const FASCIA_NAMES: NameDef[] = [
-  ['금빛 호떡', undefined, 'sun', 'blackhan'],
   ['달빛 떡볶이', 'TTEOKBOKKI', 'moon', 'jua'],
   ['NOVA CAFE', '노바 카페', 'cup', 'orbitron'],
   ['루미 코스메틱', 'LUMI COSMETIC', 'drop', 'gowun'],
@@ -90,24 +97,37 @@ const FASCIA_NAMES: NameDef[] = [
   ['오후의 베이커리', 'BAKERY', 'bread', 'notoserif'],
   ['하늘 안경원', 'OPTICAL', 'glasses', 'sunflower'],
   ['별숲 포차', undefined, 'star', 'penscript'],
-  ['BLOOM NAIL', '블룸 네일', 'flower', 'pacifico'],
+  ['BLOOM NAIL', '블룸 네일 · ネイル', 'flower', 'pacifico'],
   ['한입 만두', 'DUMPLING', 'dumpling', 'dohyeon'],
   ['블루문 BAR', undefined, 'moon', 'righteous'],
-  ['오늘 라멘', 'RAMEN', 'bowl', 'yeonsung'],
+  ['오늘 라멘', 'RAMEN · ラーメン', 'bowl', 'yeonsung'],
   ['PEACH BEAUTY', '피치 뷰티', 'heart', 'playfair'],
-  ['다온 기념품', 'SOUVENIR', 'crown', 'gaegu'],
+  ['다온 기념품', 'SOUVENIR · お土産', 'crown', 'gaegu'],
   ['PIXEL ZONE', '게임존', 'bolt', 'anton'],
   ['담소 찻집', 'TEA HOUSE', 'ring', 'gowun'],
+  ['금빛 호떡', undefined, 'sun', 'blackhan'],
   ['SEOUL GOODS', '서울 굿즈', 'hex', 'bebas'],
-  // extra shops with different moods, so no name ever has to repeat
   ['모아 문구점', 'STATIONERY', 'diamond', 'gaegu'],
   ['SUNDAY BRUNCH', '선데이 브런치', 'sun', 'playfair'],
   ['고래 아이스크림', 'ICE CREAM', 'drop', 'jua'],
   ['NEON LAB', '네온 랩', 'bolt', 'orbitron'],
-  ['은하 반점', 'CHINESE', 'ring', 'yeonsung'],
+  ['은하 반점', 'CHINESE · 中餐', 'ring', 'yeonsung'],
   ['VINTAGE FILM', '빈티지 필름', 'hex', 'cinzel'],
   ['숲속 생과일', 'JUICE BAR', 'leaf', 'sunflower'],
   ['TOKYO TOAST', '도쿄 토스트', 'bread', 'righteous'],
+  // Japanese / Chinese / calligraphy / modern faces
+  ['ひなた カフェ', 'HINATA CAFE · 히나타', 'sun', 'yuji'],
+  ['ネイルサロン 美', 'NAIL SALON · 네일', 'flower', 'dela'],
+  ['足浴 · 按摩', 'FOOT MASSAGE · 족욕', 'leaf', 'notosanstc'],
+  ['美甲 美睫', 'NAIL & LASH · 네일', 'flower', 'mashan'],
+  ['小笼包 点心', 'DIM SUM · 딤섬', 'dumpling', 'mashan'],
+  ['동해 횟집', 'EAST SEA', 'wave', 'eastsea'],
+  ['붓글 한복', 'HANBOK · 韓服', 'crown', 'brush'],
+  ['ATELIER 23', '아뜰리에 이삼', 'diamond', 'gothica1'],
+  ['NIGHT MARKET', '야시장', 'star', 'bungee'],
+  ["LOLA'S DINER", '로라 다이너', 'heart', 'lobster'],
+  ['URBAN TAILOR', '어반 테일러', 'crown', 'oswald'],
+  ['たこ焼き 屋台', 'TAKOYAKI · 타코야키', 'chili', 'notosansjp'],
 ]
 const VERTICAL_NAMES: NameDef[] = [
   ['이모네 분식', undefined, 'heart', 'jua'],
@@ -122,6 +142,13 @@ const VERTICAL_NAMES: NameDef[] = [
   ['달콤 와플', 'WAFFLE', 'hex', 'jua'],
   ['포토 스튜디오', 'PHOTO', 'glasses', 'dohyeon'],
   ['레코드 샵', 'RECORDS', 'ring', 'sunflower'],
+  // Japanese tategaki (columns, right to left), rotated Latin, Chinese stacks
+  ['占いの館', 'ウラナイ', 'moon', 'yuji', 'tategaki'],
+  ['ラーメン', 'RAMEN', 'bowl', 'dela', 'tategaki'],
+  ['足疗按摩', 'FOOT SPA', 'leaf', 'notosanstc', 'stack'],
+  ['美容院', 'SALON', 'crown', 'mashan', 'stack'],
+  ['MOON LIGHT BAR', '문라이트', 'moon', 'bungee', 'rotate'],
+  ['SEOUL MARKET', '서울마켓', 'hex', 'oswald', 'rotate'],
 ]
 const ROUND_NAMES: NameDef[] = [
   ['달 카페', 'CAFE', 'cup', 'gowun'],
@@ -132,6 +159,9 @@ const ROUND_NAMES: NameDef[] = [
   ['귤 카페', 'TANGERINE', 'leaf', 'pacifico'],
   ['호호 분식', 'HOHO', 'heart', 'gaegu'],
   ['밤 산책', 'NIGHT WALK', 'moon', 'notoserif'],
+  ['カフェ', 'CAFE', 'cup', 'dela'],
+  ['茶', 'TEA', 'leaf', 'mashan'],
+  ['占', '운세', 'moon', 'yuji'],
 ]
 const BANNER_NAMES: NameDef[] = [
   ['몽글 빙수', 'BINGSU', 'diamond', 'jua'],
@@ -144,7 +174,28 @@ const BANNER_NAMES: NameDef[] = [
   ['꽃 카페', 'FLOWER', 'flower', 'penscript'],
   ['달다 마카롱', 'MACARON', 'heart', 'gowun'],
   ['한밤 치킨', 'NIGHT BITE', 'chili', 'yeonsung'],
+  ['美白 エステ', 'ESTHE', 'drop', 'yuji', 'tategaki'],
+  ['美颜 护肤', 'SKIN CARE', 'drop', 'notosanstc', 'stack'],
+  ['やきとり', 'YAKITORI', 'chili', 'dela', 'tategaki'],
 ]
+const defaultVert = (brand: string): Vert => (scriptOf(brand) === 'latin' ? 'rotate' : 'stack')
+
+/** Seeded shuffle so the street mixes languages and moods instead of following table order. */
+function shuffled<T>(arr: T[], seed: number): T[] {
+  const r0 = mulberry32(seed)
+  const a = arr.slice()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(r0() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+const SHUFFLED = {
+  F: shuffled(FASCIA_NAMES, 11),
+  V: shuffled(VERTICAL_NAMES, 22),
+  R: shuffled(ROUND_NAMES, 33),
+  B: shuffled(BANNER_NAMES, 44),
+}
 
 /**
  * Pick a shop identity: never reuse a name, and prefer a typeface / logo that is not already
@@ -152,20 +203,14 @@ const BANNER_NAMES: NameDef[] = [
  */
 const usedNames = new Set<string>()
 const placed: { z: number; font: FontId; logo: Logo }[] = []
-let pickCounter = 0
-function pickName(table: NameDef[], zc: number, originals: number): NameDef {
+function pickName(table: NameDef[], zc: number): NameDef {
   const pool = table.filter((n) => !usedNames.has(n[0]))
   const list = pool.length ? pool : table
   const near = placed.filter((p) => Math.abs(p.z - zc) < 16)
-  pickCounter++
   let best = list[0]
   let bestScore = Infinity
   for (const n of list) {
-    // original shops are preferred; the extra shops only step in when an original would clash with a neighbour
-    const score =
-      (near.some((p) => p.font === n[3]) ? 2 : 0) +
-      (near.some((p) => p.logo === n[2] && Math.abs(p.z - zc) < 9) ? 1 : 0) +
-      (table.indexOf(n) >= originals ? 0.5 : 0)
+    const score = (near.some((p) => p.font === n[3]) ? 2 : 0) + (near.some((p) => p.logo === n[2] && Math.abs(p.z - zc) < 9) ? 1 : 0)
     if (score < bestScore) {
       best = n
       bestScore = score
@@ -223,6 +268,8 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     layout: (idx * 7 + 3) % 6,
     frame: (idx * 5 + 1) % 6,
     badge: idx % 3 === 1,
+    metal: idx % 5,
+    chan: idx % 3 !== 0,
     id,
     side,
     wallX,
@@ -238,36 +285,36 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
     bandX: 0.24,
   }
   if (kind === 'H') {
-    const [brand, sub, logo, fontId] = pickName(FASCIA_NAMES, zc, 18)
+    const [brand, sub, logo, fontId] = pickName(SHUFFLED.F, zc)
     const w = Math.min(b.w - 2.9, r(3.2, 4.8))
     const h = r(1.0, 1.5)
     return {
-      ...base, brand, sub, logo, fontId, type: 'FASCIA', shape: 'box', hinge: false,
+      ...base, brand, sub, logo, fontId, vert: 'stack', type: 'FASCIA', shape: 'box', hinge: false,
       w, h, y0: 3.7 + (rng() - 0.5) * 0.7, y1: 3.675, d0: r(0.28, 0.46), d1: 0.06,
       s1: Math.min(1, 0.9 / h), e0: r(1.7, 2.8),
     }
   }
   if (kind === 'V') {
-    const [brand, sub, logo, fontId] = pickName(VERTICAL_NAMES, zc, 9)
+    const [brand, sub, logo, fontId, vd] = pickName(SHUFFLED.V, zc)
     const h = r(2.6, 5.0)
     return {
-      ...base, brand, sub, logo, fontId, type: 'VERTICAL', shape: 'box', hinge: true,
+      ...base, brand, sub, logo, fontId, vert: vd ?? defaultVert(brand), type: 'VERTICAL', shape: 'box', hinge: true,
       w: r(0.75, 1.05), h, y0: Math.max(h / 2 + 4.5, r(5.2, 8.5)), y1: 5.8, d0: 0.22, d1: 0.06,
       s1: Math.min(1, 2.9 / h), e0: r(2.0, 3.0),
     }
   }
   if (kind === 'R') {
-    const [brand, sub, logo, fontId] = pickName(ROUND_NAMES, zc, 5)
+    const [brand, sub, logo, fontId] = pickName(SHUFFLED.R, zc)
     const rad = r(0.5, 0.68)
     return {
-      ...base, brand, sub, logo, fontId, type: 'ROUND', shape: 'disc', hinge: true,
+      ...base, brand, sub, logo, fontId, vert: 'stack', type: 'ROUND', shape: 'disc', hinge: true,
       w: rad * 2, h: rad * 2, y0: r(3.9, 5.8), y1: 5.7, d0: 0.16, d1: 0.05, s1: 0.78, e0: r(2.0, 3.0),
     }
   }
-  const [brand, sub, logo, fontId] = pickName(BANNER_NAMES, zc, 8)
+  const [brand, sub, logo, fontId, vd] = pickName(SHUFFLED.B, zc)
   const h = r(4.5, 6.8)
   return {
-    ...base, brand, sub, logo, fontId, type: 'BANNER', shape: 'box', hinge: false, bandX: 0.02,
+    ...base, brand, sub, logo, fontId, vert: vd ?? defaultVert(brand), type: 'BANNER', shape: 'box', hinge: false, bandX: 0.02,
     w: r(1.15, 1.6), h, y0: h / 2 + 4.5 + r(0, 1.2), y1: 5.9, d0: 0.45, d1: 0.06,
     s1: Math.min(1, 3.0 / h), e0: r(2.2, 3.0),
   }
@@ -304,9 +351,19 @@ function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {
   }
 })
 
+// optional real brand artwork (see brandAssets.ts)
+signs.forEach((s) => {
+  const u = BRAND_LOGOS[s.brand]
+  if (u) s.logoUrl = u
+})
+
 /* ---------------------------- architecture instances ---------------------------- */
 export const arch = {
   walls: [] as Inst[],
+  wallTex: [[], [], [], [], []] as Inst[][], // stucco, brick, tile, metal panel, concrete
+  acBody: [] as Inst[],
+  acFan: [] as Inst[],
+  pipes: [] as Inst[],
   ledges: [] as Inst[],
   pilasters: [] as Inst[],
   bands: [] as Inst[],
@@ -333,7 +390,9 @@ buildings.forEach((b) => {
   const dir = -side
   // main upper block
   const upperH = b.H - GROUND_H
-  arch.walls.push({ p: [wallX + side * (b.D / 2), GROUND_H + upperH / 2, b.zc], s: [b.D, upperH, b.w], c: b.wall })
+  // textured upper block: material depends on the building (stucco / brick / tile / metal panel / concrete)
+  const mat = b.style % 5
+  arch.wallTex[mat].push({ p: [wallX + side * (b.D / 2), GROUND_H + upperH / 2, b.zc], s: [b.D, upperH, b.w], c: mat === 0 || mat === 4 ? b.wall : '#ffffff', uv: [b.w / 1.6, upperH / 1.6] })
   // ground block behind shop interior (solid)
   arch.walls.push({ p: [wallX + side * (3.2 + (b.D - 3.2) / 2), GROUND_H / 2, b.zc], s: [b.D - 3.2, GROUND_H, b.w], c: '#303030' })
   // fascia band (dark base for signage)
@@ -348,6 +407,8 @@ buildings.forEach((b) => {
   }
   // roof parapet + occasional rooftop mass
   arch.roof.push({ p: [wallX + dir * 0.0, b.H + 0.35, b.zc], s: [0.5, 0.7, b.w], c: b.wall })
+  // drain pipe running up the party-wall corner
+  if (ar() > 0.45) arch.pipes.push({ p: [wallX + dir * 0.06, (GROUND_H + b.H) / 2, b.z0 + 0.24], s: [0.07, b.H - GROUND_H, 0.07], c: '#55565a' })
   if (ar() > 0.55) arch.roof.push({ p: [wallX + side * 3, b.H + 0.9, b.zc + a(-1.5, 1.5)], s: [2.4, 1.8, 2], c: '#6e6e6e' })
 
   // shop interior (lit room seen through glass)
@@ -400,6 +461,12 @@ buildings.forEach((b) => {
       }
       ;(lit ? arch.windowsLit : arch.windowsDark).push(inst)
       if (!curtain) arch.sills.push({ p: [wallX + dir * 0.13, yc - hh / 2 - 0.05, zz], s: [0.3, 0.08, ww + 0.25], c: '#b8b2a8' })
+      // outdoor air-conditioner unit beside some upper windows
+      if (f >= 1 && !curtain && ar() > 0.78 && zz + 0.95 < b.z1 - 0.3) {
+        const az = zz + 0.88
+        arch.acBody.push({ p: [wallX + dir * 0.2, yc - 0.35, az], s: [0.34, 0.5, 0.66], c: '#c9ccd1' })
+        arch.acFan.push({ p: [wallX + dir * 0.375, yc - 0.33, az], s: [0.4, 0.02, 0.4], rz: Math.PI / 2, c: '#2a2b2f' })
+      }
     }
   }
   // vertical fins (style 4) in the upper zone, clear of the sign band

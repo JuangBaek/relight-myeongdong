@@ -3,7 +3,8 @@ import { Architecture } from './world/Architecture'
 import { Controls } from './world/Controls'
 import { Lighting } from './world/Lights'
 import { SignLayer } from './world/Sign'
-import { EndCaps, Ground, Lamps, Pedestrians, Stalls } from './world/StreetProps'
+import { EndCaps, Ground, Lamps, Stalls } from './world/StreetProps'
+import { Pedestrians } from './world/Pedestrians'
 import { UI } from './ui/UI'
 
 export default function App() {

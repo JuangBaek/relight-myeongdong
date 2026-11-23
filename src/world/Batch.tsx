@@ -13,12 +13,17 @@ export function Batch({ items, geo = 'box', children }: { items: Inst[]; geo?: G
     const o = new THREE.Object3D()
     const col = new THREE.Color()
     let hasColor = false
+    const uvs = items.some((it) => it.uv) ? new Float32Array(items.length * 2) : null
     items.forEach((it, i) => {
       o.position.set(...it.p)
       o.rotation.set(it.rx ?? 0, it.ry ?? 0, it.rz ?? 0)
       o.scale.set(...it.s)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
+      if (uvs && it.uv) {
+        uvs[i * 2] = it.uv[0]
+        uvs[i * 2 + 1] = it.uv[1]
+      }
       if (it.c !== undefined) {
         hasColor = true
         if (Array.isArray(it.c)) col.setRGB(it.c[0], it.c[1], it.c[2], THREE.LinearSRGBColorSpace)
@@ -26,6 +31,7 @@ export function Batch({ items, geo = 'box', children }: { items: Inst[]; geo?: G
         m.setColorAt(i, col)
       }
     })
+    if (uvs) m.geometry.setAttribute('uvScale', new THREE.InstancedBufferAttribute(uvs, 2))
     m.instanceMatrix.needsUpdate = true
     if (hasColor && m.instanceColor) m.instanceColor.needsUpdate = true
   }, [items])

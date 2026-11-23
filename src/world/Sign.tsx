@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { signs, type SignData } from './layout'
 import { getGlowTexture, makeSignTexture } from './textures'
 import { ensureFonts, FONTS } from './fonts'
+import { loadBrandLogo } from './brandAssets'
 import { targetFor, useStore } from '../store'
 
 /* ------------ shared runtime registries (read by lights, picker and UI) ------------ */
@@ -30,7 +31,6 @@ const smooth = (x: number) => {
   return x * x * (3 - 2 * x)
 }
 
-const metal = new THREE.MeshStandardMaterial({ color: '#1b1b1d', metalness: 0.8, roughness: 0.45 })
 const mint = new THREE.Color('#ADFFB6')
 const tmpA = new THREE.Color()
 const tmpB = new THREE.Color()
@@ -58,6 +58,40 @@ function makeFrameGeo(s: SignData) {
   ])!
 }
 
+const METALS = ['#1c1c1e', '#3b3d42', '#9aa0a8', '#6b5036', '#b9a98a'] // black, graphite, aluminium, bronze, champagne
+
+/** Metal frame hugging the sign body (unit depth, scaled in Z each frame to the live body thickness). */
+function makeMetalGeo(s: SignData) {
+  const tt = 0.055
+  if (s.shape === 'disc') return new THREE.TorusGeometry(s.w / 2 + tt * 0.35, tt * 0.55, 8, 56)
+  const bar = (w: number, h: number, x: number, y: number) => {
+    const g = new THREE.BoxGeometry(w, h, 1)
+    g.translate(x, y, 0)
+    return g
+  }
+  return mergeGeometries([
+    bar(s.w + tt * 2, tt, 0, s.h / 2 + tt / 2),
+    bar(s.w + tt * 2, tt, 0, -s.h / 2 - tt / 2),
+    bar(tt, s.h, -s.w / 2 - tt / 2, 0),
+    bar(tt, s.h, s.w / 2 + tt / 2, 0),
+  ])!
+}
+
+/** Four fixing bolts at the corners of a wall-mounted face. */
+function makeBoltGeo(s: SignData) {
+  const ix = Math.max(0.1, s.w / 2 - 0.1)
+  const iy = Math.max(0.1, s.h / 2 - 0.1)
+  const pts: [number, number][] = s.shape === 'disc' ? [[0, iy * 0.82], [0, -iy * 0.82], [ix * 0.82, 0], [-ix * 0.82, 0]] : [[-ix, iy], [ix, iy], [-ix, -iy], [ix, -iy]]
+  return mergeGeometries(
+    pts.map(([x, y]) => {
+      const g = new THREE.CylinderGeometry(0.022, 0.022, 0.05, 8)
+      g.rotateX(Math.PI / 2)
+      g.translate(x, y, 0)
+      return g
+    }),
+  )!
+}
+
 function SignView({ s }: { s: SignData }) {
   const prog = progress[s.id]
   const rt = runtime.get(s.id)!
@@ -79,9 +113,22 @@ function SignView({ s }: { s: SignData }) {
   const shadowF = useRef<THREE.Mesh>(null!)
   const frameF = useRef<THREE.Mesh>(null!)
   const frameB = useRef<THREE.Mesh>(null!)
+  const metalF = useRef<THREE.Mesh>(null!)
+  const bolts = useRef<THREE.Mesh>(null!)
+  const arm2 = useRef<THREE.Mesh>(null!)
+  const plate = useRef<THREE.Mesh>(null!)
+  const lift = useRef<THREE.Mesh>(null!)
+  const wallShadow = useRef<THREE.Mesh>(null!)
+  const metalGeo = useMemo(() => makeMetalGeo(s), [s])
+  const boltGeo = useMemo(() => makeBoltGeo(s), [s])
   const mats = useMemo(
     () => ({
-      panel: new THREE.MeshStandardMaterial({ color: s.panel0, emissive: s.panel0, emissiveIntensity: s.e0, roughness: 0.55, metalness: 0.1 }),
+      // light-diffusing acrylic face: glossy clear-coat reflects the street while the body glows from within
+      panel: new THREE.MeshPhysicalMaterial({ color: s.panel0, emissive: s.panel0, emissiveIntensity: s.e0, roughness: 0.5, metalness: 0.05, clearcoat: 0.6, clearcoatRoughness: 0.22 }),
+      // metal frame / brackets / bolts: finish and roughness differ per sign
+      metal: new THREE.MeshStandardMaterial({ color: METALS[s.metal % METALS.length], metalness: 0.85, roughness: 0.28 + (s.metal % 3) * 0.1 }),
+      // soft contact shadow the sign casts on the wall behind it
+      wallShadow: new THREE.MeshBasicMaterial({ map: glowTex, color: '#000', transparent: true, depthWrite: false, opacity: 0.3, toneMapped: false }),
       text: new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }),
       // mint neon glow behind the lettering (additive) – only exists once improved
       halo: new THREE.MeshBasicMaterial({ map: texs.halo, transparent: true, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }),
@@ -97,9 +144,9 @@ function SignView({ s }: { s: SignData }) {
   // draw the artwork with the shop's own typeface once it has loaded (first paint uses system fallback)
   useEffect(() => {
     let alive = true
-    ensureFonts(FONTS[s.fontId], s.brand, s.sub ?? '').then(() => {
+    Promise.all([ensureFonts(FONTS[s.fontId], s.brand, s.sub ?? ''), loadBrandLogo(s.logoUrl)]).then(([, img]) => {
       if (!alive) return
-      const t = makeSignTexture(s)
+      const t = makeSignTexture(s, img)
       const old = mats.text.map
       mats.text.map = t.text
       mats.halo.map = t.halo
@@ -200,12 +247,37 @@ function SignView({ s }: { s: SignData }) {
     if (s.hinge) frameB.current.position.set(offX, 0, pz - d / 2 - 0.016)
     else frameB.current.visible = false
 
-    // bracket arm for projecting signs
+    // metal frame follows the live body thickness
+    metalF.current.position.set(offX, 0, pz)
+    metalF.current.scale.set(1, 1, d + 0.035)
+
+    // raised channel-letter relief: a second copy of the lettering lifted off the face (parallax shows thickness)
+    lift.current.visible = s.chan
+    if (s.chan) {
+      lift.current.position.set(offX, 0, fz + 0.016)
+      lift.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
+    }
+    mats.shadow.opacity = s.chan ? 0.5 : 0.3
+    shadowF.current.visible = true
+
+    // wall-mount hardware: bolts on flush faces, standoff brackets + wall plate on projecting signs
+    bolts.current.visible = !s.hinge || pm > 0.85
+    bolts.current.position.set(offX, 0, fz + 0.022)
     if (s.hinge) {
+      const tall = s.shape === 'box' && s.h > 1.3
       arm.current.visible = true
-      arm.current.position.set(offX, s.shape === 'disc' ? 0 : s.h / 2 - 0.12, 0)
+      arm.current.position.set(offX, s.shape === 'disc' ? 0 : s.h / 2 - 0.14, 0)
       arm.current.scale.set(s.w, 0.05, 0.05)
-    } else arm.current.visible = false
+      arm2.current.visible = tall
+      arm2.current.position.set(offX, -s.h / 2 + 0.14, 0)
+      arm2.current.scale.set(s.w, 0.05, 0.05)
+      plate.current.visible = true
+      plate.current.scale.set(0.045, s.shape === 'disc' ? 0.3 : Math.max(0.3, s.h - 0.15), 0.13)
+    } else {
+      arm.current.visible = false
+      arm2.current.visible = false
+      plate.current.visible = false
+    }
 
     // materials: saturation + LED output fall, text stays legible
     tmpA.lerpColors(c0, c1, pc)
@@ -224,7 +296,6 @@ function SignView({ s }: { s: SignData }) {
     if (s.hinge) frameB.current.visible = showFrame
     haloF.current.visible = false
     haloB.current.visible = false
-    shadowF.current.visible = false
 
     // runtime for lights / UI
     const power = e / E_MAX
@@ -240,6 +311,13 @@ function SignView({ s }: { s: SignData }) {
 
     // spill light on façade + pavement (follows emission)
     const spill = THREE.MathUtils.lerp(1, 0.75, pc)
+    // contact shadow on the wall (below/behind the sign); shrinks to the sign's width while it is still projecting
+    const ws = wallShadow.current
+    const shW = (s.hinge ? THREE.MathUtils.lerp(0.55, s.w * sc, pm) : s.w * sc) + 0.5
+    const shH = s.h * sc + 0.5
+    ws.position.set(s.wallX + s.dir * (s.bandX + 0.014), y - 0.16 * sc, cz)
+    ws.scale.set(shW, shH, 1)
+    mats.wallShadow.opacity = s.hinge && pm < 0.1 ? 0.3 : 0.34
     const wg = wallGlow.current
     wg.position.set(s.wallX + s.dir * 0.3, y, cz)
     const wsize = Math.max(s.w, s.h) * sc * 1.5 + 2.2
@@ -267,10 +345,22 @@ function SignView({ s }: { s: SignData }) {
         <mesh ref={haloB} geometry={textGeo} material={mats.halo} rotation={[0, Math.PI, 0]} raycast={() => null} />
         <mesh ref={frameF} geometry={frameGeo} material={mats.frame} raycast={() => null} />
         <mesh ref={frameB} geometry={frameGeo} material={mats.frame} rotation={[0, Math.PI, 0]} raycast={() => null} />
-        <mesh ref={arm} material={metal} raycast={() => null}>
+        <mesh ref={lift} geometry={textGeo} material={mats.text} raycast={() => null} />
+        <mesh ref={metalF} geometry={metalGeo} material={mats.metal} raycast={() => null} />
+        <mesh ref={bolts} geometry={boltGeo} material={mats.metal} raycast={() => null} />
+        <mesh ref={plate} material={mats.metal} raycast={() => null}>
+          <boxGeometry args={[1, 1, 1]} />
+        </mesh>
+        <mesh ref={arm} material={mats.metal} raycast={() => null}>
+          <boxGeometry args={[1, 1, 1]} />
+        </mesh>
+        <mesh ref={arm2} material={mats.metal} raycast={() => null}>
           <boxGeometry args={[1, 1, 1]} />
         </mesh>
       </group>
+      <mesh ref={wallShadow} rotation={[0, dirYaw, 0]} material={mats.wallShadow} raycast={() => null} renderOrder={2}>
+        <planeGeometry args={[1, 1]} />
+      </mesh>
       <mesh ref={wallGlow} rotation={[0, dirYaw, 0]} material={mats.wall} raycast={() => null} renderOrder={5}>
         <planeGeometry args={[1, 1]} />
       </mesh>

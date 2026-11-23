@@ -236,7 +236,7 @@ export function UI() {
             className="btn mt-8 !px-8 !py-3 active"
             onClick={() => {
               start()
-              document.querySelector('canvas')?.requestPointerLock?.()
+              void (document.querySelector('canvas')?.requestPointerLock?.() as unknown as Promise<void> | undefined)?.catch?.(() => {})
             }}
           >
             ENTER THE STREET

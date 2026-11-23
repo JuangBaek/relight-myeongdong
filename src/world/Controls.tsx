@@ -94,7 +94,7 @@ export function Controls() {
         const id = pickAt(0, 0)
         if (id) s.clickSign(id)
       } else if (dragged < 6) {
-        el.requestPointerLock?.()
+        void (el.requestPointerLock?.() as unknown as Promise<void> | undefined)?.catch?.(() => {})
       }
       downPos = null
     }

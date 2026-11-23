@@ -270,6 +270,40 @@ function drawTextLine(ctx: Ctx, text: string, cx: number, cy: number, sp: number
   }
 }
 
+/** Brand artwork supplied as PNG/SVG: its alpha channel is used as a one-colour mask, tinted like the lettering. */
+function drawImageMask(ctx: Ctx, img: HTMLImageElement, cx: number, cy: number, size: number) {
+  const k = Math.min(size / img.width, size / img.height)
+  const w = Math.max(2, Math.round(img.width * k))
+  const h = Math.max(2, Math.round(img.height * k))
+  const tmp = document.createElement('canvas')
+  tmp.width = w
+  tmp.height = h
+  const t = tmp.getContext('2d')!
+  t.drawImage(img, 0, 0, w, h)
+  t.globalCompositeOperation = 'source-in'
+  t.fillStyle = '#fff'
+  t.fillRect(0, 0, w, h)
+  ctx.drawImage(tmp, cx - w / 2, cy - h / 2)
+}
+
+/** Upright column of characters (Korean/Japanese/Chinese). Long-vowel and dash marks rotate like real tategaki. */
+function drawColumn(ctx: Ctx, chars: string[], cx: number, top: number, avail: number, px: number, f: FontDef, outline: boolean) {
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.font = fontStr(f, px)
+  chars.forEach((ch, i) => {
+    const y = top + (avail / chars.length) * (i + 0.5)
+    const turn = /[ー－―〜~…\-]/.test(ch)
+    ctx.save()
+    ctx.translate(cx, y)
+    if (turn) ctx.rotate(Math.PI / 2)
+    if (outline) {
+      ctx.lineWidth = Math.max(2, px * 0.05)
+      ctx.strokeText(ch, 0, 0)
+    } else ctx.fillText(ch, 0, 0)
+    ctx.restore()
+  })
+}
 /* ------------------------------------------------------------------ *
  *  Frame variants (border styles)
  * ------------------------------------------------------------------ */
@@ -332,10 +366,10 @@ function drawFrame(ctx: Ctx, W: number, H: number, v: number, disc: boolean) {
  *  Sign artwork: white-on-transparent. Each shop differs by typeface,
  *  composition, logo style and border.
  * ------------------------------------------------------------------ */
-export function makeSignTexture(s: SignData): { text: THREE.CanvasTexture; halo: THREE.CanvasTexture } {
-  const ppm = 230
-  const W = Math.max(128, Math.min(1400, Math.round(s.w * ppm)))
-  const H = Math.max(128, Math.min(1600, Math.round(s.h * ppm)))
+export function makeSignTexture(s: SignData, logoImg?: HTMLImageElement | null): { text: THREE.CanvasTexture; halo: THREE.CanvasTexture } {
+  const ppm = 300 // texels per metre: crisp lettering even when the viewer stands next to the sign
+  const W = Math.max(128, Math.min(1600, Math.round(s.w * ppm)))
+  const H = Math.max(128, Math.min(1800, Math.round(s.h * ppm)))
   const c = document.createElement('canvas')
   c.width = W
   c.height = H
@@ -345,11 +379,15 @@ export function makeSignTexture(s: SignData): { text: THREE.CanvasTexture; halo:
   ctx.textBaseline = 'middle'
 
   const F = FONTS[s.fontId]
-  const SF = subFont()
+  const SF = subFont(s.sub ?? '')
   const L = s.layout
   const vertical = s.type === 'VERTICAL' || s.type === 'BANNER'
 
-  const logo = (kind: Logo, x: number, y: number, r: number, badge = s.badge) => (badge ? drawBadge(ctx, kind, x, y, r * 1.25) : drawLogo(ctx, kind, x, y, r))
+  const logo = (kind: Logo, x: number, y: number, r: number, badge = s.badge) => {
+    if (logoImg) drawImageMask(ctx, logoImg, x, y, r * 2.2)
+    else if (badge) drawBadge(ctx, kind, x, y, r * 1.25)
+    else drawLogo(ctx, kind, x, y, r)
+  }
 
   if (s.shape === 'disc') {
     drawFrame(ctx, W, H, s.frame, true)
@@ -369,14 +407,13 @@ export function makeSignTexture(s: SignData): { text: THREE.CanvasTexture; halo:
     const logoR = W * 0.2
     const logoTop = L % 3 !== 2 // some shops put the mark at the bottom
     const outline = L % 3 === 1 && s.type === 'BANNER'
-    const rotated = L === 4 || L === 5
     const logoY = logoTop ? W * 0.36 : H - W * 0.38
     logo(s.logo, W / 2, logoY, logoR)
     const top = logoTop ? W * 0.36 + logoR * 1.3 + W * 0.14 : W * 0.2
-    const bottom = logoTop ? (s.sub ? H - W * 0.5 : H - W * 0.2) : H - W * 0.38 - logoR * 1.3 - W * 0.14
+    const bottom = logoTop ? (s.sub && s.vert !== 'tategaki' ? H - W * 0.5 : H - W * 0.2) : H - W * 0.38 - logoR * 1.3 - W * 0.14
     const avail = bottom - top
-    if (rotated) {
-      // text reads top-to-bottom, rotated 90° like many real vertical signs
+    if (s.vert === 'rotate') {
+      // ONE line of text rotated 90°, reading top-to-bottom (typical for Latin names on tall signs)
       ctx.save()
       ctx.translate(W / 2, top + avail / 2)
       ctx.rotate(Math.PI / 2)
@@ -384,25 +421,35 @@ export function makeSignTexture(s: SignData): { text: THREE.CanvasTexture; halo:
       ctx.font = fontStr(F, px)
       drawTextLine(ctx, s.brand, 0, 0, F.spacing * px, outline, Math.max(2, px * 0.05))
       ctx.restore()
+    } else if (s.vert === 'tategaki') {
+      // Japanese tategaki: main name in the right column, small reading/sub-line in a left column
+      const chars = Array.from(s.brand.replace(/\s/g, ''))
+      const px = Math.min(W * 0.4 * F.size, (avail / chars.length) * 0.96)
+      drawColumn(ctx, chars, W * 0.64, top, avail, px, F, outline)
+      if (s.sub) {
+        const sc = Array.from(s.sub.replace(/\s/g, '')).slice(0, 9)
+        const spx = Math.min(W * 0.17, ((avail * 0.85) / sc.length) * 0.96)
+        drawColumn(ctx, sc, W * 0.22, top + avail * 0.05, avail * 0.85, spx, SF, false)
+      }
+      ctx.save()
+      ctx.globalAlpha = 0.55
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(W * 0.42, top)
+      ctx.lineTo(W * 0.42, top + avail)
+      ctx.stroke()
+      ctx.restore()
     } else {
+      // upright stack: one character per row, like Korean / Chinese vertical signs
       const chars = Array.from(s.brand.replace(/\s/g, ''))
       const px = Math.min(W * 0.66 * F.size, (avail / chars.length) * 0.96)
-      ctx.font = fontStr(F, px)
-      ctx.textAlign = 'center'
-      chars.forEach((ch, i) => {
-        const y = top + (avail / chars.length) * (i + 0.5)
-        if (outline) {
-          ctx.lineWidth = Math.max(2, px * 0.05)
-          ctx.strokeText(ch, W / 2, y)
-        } else ctx.fillText(ch, W / 2, y)
-      })
+      drawColumn(ctx, chars, W / 2, top, avail, px, F, outline)
     }
-    if (s.sub && logoTop) {
+    if (s.sub && logoTop && s.vert !== 'tategaki') {
       const sp = fit(ctx, SF, s.sub, W * 0.82, W * 0.17)
       ctx.font = fontStr(SF, sp)
       drawTextLine(ctx, s.sub, W / 2, H - W * 0.28, SF.spacing * sp)
-    }
-  } else {
+    }  } else {
     // horizontal fascia — six compositions
     drawFrame(ctx, W, H, s.frame, false)
     const hasWide = W > H * 2.6
@@ -580,4 +627,110 @@ export function makeGroundTexture() {
   tex.colorSpace = THREE.SRGBColorSpace
   tex.anisotropy = 8
   return tex
+}
+
+/* ------------------------------------------------------------------ *
+ *  Facade material textures (each tile covers ~1.6 m of wall).
+ *  0 stucco · 1 brick · 2 glazed tile · 3 metal panel · 4 concrete
+ * ------------------------------------------------------------------ */
+export function makeWallTextures(): THREE.CanvasTexture[] {
+  const S = 256
+  let seed = 99
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const mk = (draw: (ctx: CanvasRenderingContext2D) => void) => {
+    const c = document.createElement('canvas')
+    c.width = c.height = S
+    draw(c.getContext('2d')!)
+    const t = new THREE.CanvasTexture(c)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 8
+    return t
+  }
+  const noise = (ctx: CanvasRenderingContext2D, base: number, amp: number, dots = 5000) => {
+    ctx.fillStyle = `rgb(${base},${base},${base})`
+    ctx.fillRect(0, 0, S, S)
+    for (let i = 0; i < dots; i++) {
+      const v = base + (rnd() - 0.5) * amp
+      ctx.fillStyle = `rgba(${v},${v},${v},0.35)`
+      ctx.fillRect(rnd() * S, rnd() * S, 1 + rnd() * 3, 1 + rnd() * 3)
+    }
+  }
+  return [
+    // stucco (neutral, tinted per building)
+    mk((ctx) => {
+      noise(ctx, 215, 40, 7000)
+      ctx.strokeStyle = 'rgba(0,0,0,0.05)'
+      for (let i = 0; i < 18; i++) {
+        const x = rnd() * S
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x + (rnd() - 0.5) * 10, S)
+        ctx.stroke()
+      }
+    }),
+    // brick
+    mk((ctx) => {
+      ctx.fillStyle = '#6d5f56'
+      ctx.fillRect(0, 0, S, S)
+      const rows = 10
+      const bw = S / 4
+      const bh = S / rows
+      for (let r = 0; r < rows; r++) {
+        for (let k = -1; k < 4; k++) {
+          const off = r % 2 ? bw / 2 : 0
+          const v = 150 + rnd() * 50
+          ctx.fillStyle = `rgb(${v},${v * 0.52},${v * 0.4})`
+          ctx.fillRect(k * bw + off + 2, r * bh + 2, bw - 4, bh - 4)
+        }
+      }
+    }),
+    // glazed tile (small squares, cream)
+    mk((ctx) => {
+      ctx.fillStyle = '#9a9690'
+      ctx.fillRect(0, 0, S, S)
+      const n = 12
+      const t = S / n
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          const v = 218 + rnd() * 28
+          ctx.fillStyle = `rgb(${v},${v - 3},${v - 12})`
+          ctx.fillRect(i * t + 1.5, j * t + 1.5, t - 3, t - 3)
+        }
+    }),
+    // metal panel (vertical seams + rivets)
+    mk((ctx) => {
+      noise(ctx, 150, 24, 3000)
+      const pw = S / 3
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = 'rgba(0,0,0,0.38)'
+        ctx.fillRect(i * pw, 0, 3, S)
+        ctx.fillStyle = 'rgba(255,255,255,0.16)'
+        ctx.fillRect(i * pw + 3, 0, 2, S)
+        for (let y = 16; y < S; y += 32) {
+          ctx.fillStyle = 'rgba(0,0,0,0.5)'
+          ctx.beginPath()
+          ctx.arc(i * pw + 12, y, 2, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+    }),
+    // concrete with form-tie holes and stains
+    mk((ctx) => {
+      noise(ctx, 170, 55, 9000)
+      for (let i = 0; i < 6; i++) {
+        const g = ctx.createLinearGradient(0, 0, 0, S)
+        g.addColorStop(0, 'rgba(0,0,0,0)')
+        g.addColorStop(1, 'rgba(0,0,0,0.12)')
+        ctx.fillStyle = g
+        ctx.fillRect(rnd() * S, 0, 6 + rnd() * 14, S)
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'
+      for (const x of [S / 4, (3 * S) / 4]) for (const y of [S / 4, (3 * S) / 4]) {
+        ctx.beginPath()
+        ctx.arc(x, y, 3.2, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }),
+  ]
 }
