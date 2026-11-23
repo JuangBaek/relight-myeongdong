@@ -128,6 +128,12 @@ const FASCIA_NAMES: NameDef[] = [
   ["LOLA'S DINER", '로라 다이너', 'heart', 'lobster'],
   ['URBAN TAILOR', '어반 테일러', 'crown', 'oswald'],
   ['たこ焼き 屋台', 'TAKOYAKI · 타코야키', 'chili', 'notosansjp'],
+  ['PAPER MOON', '페이퍼문', 'moon', 'playfair'],
+  ['한강 치맥', 'CHIMAEK', 'cup', 'blackhan'],
+  ['PLAYBOX', '플레이박스', 'hex', 'bungee'],
+  ['꿀 베이글', 'HONEY BAGEL', 'ring', 'jua'],
+  ['青空 書店', 'BOOKS · 서점', 'diamond', 'yuji'],
+  ['SNEAKER ROOM', '스니커룸', 'bolt', 'oswald'],
 ]
 const VERTICAL_NAMES: NameDef[] = [
   ['이모네 분식', undefined, 'heart', 'jua'],
@@ -149,6 +155,10 @@ const VERTICAL_NAMES: NameDef[] = [
   ['美容院', 'SALON', 'crown', 'mashan', 'stack'],
   ['MOON LIGHT BAR', '문라이트', 'moon', 'bungee', 'rotate'],
   ['SEOUL MARKET', '서울마켓', 'hex', 'oswald', 'rotate'],
+  ['꽃집', 'FLORIST', 'flower', 'gowun'],
+  ['お好み焼き', 'OKONOMIYAKI', 'bread', 'dela', 'tategaki'],
+  ['茶楼', 'TEA HOUSE', 'leaf', 'yuji', 'stack'],
+  ['HOT STAGE', '핫스테이지', 'bolt', 'anton', 'rotate'],
 ]
 const ROUND_NAMES: NameDef[] = [
   ['달 카페', 'CAFE', 'cup', 'gowun'],
@@ -162,6 +172,11 @@ const ROUND_NAMES: NameDef[] = [
   ['カフェ', 'CAFE', 'cup', 'dela'],
   ['茶', 'TEA', 'leaf', 'mashan'],
   ['占', '운세', 'moon', 'yuji'],
+  ['달토끼', 'MOON RABBIT', 'moon', 'gaegu'],
+  ['홍차', 'BLACK TEA', 'cup', 'playfair'],
+  ['ボバ', 'BOBA', 'drop', 'dela'],
+  ['辣', 'SPICY', 'chili', 'mashan'],
+  ['딸기', 'BERRY', 'heart', 'jua'],
 ]
 const BANNER_NAMES: NameDef[] = [
   ['몽글 빙수', 'BINGSU', 'diamond', 'jua'],
@@ -177,6 +192,10 @@ const BANNER_NAMES: NameDef[] = [
   ['美白 エステ', 'ESTHE', 'drop', 'yuji', 'tategaki'],
   ['美颜 护肤', 'SKIN CARE', 'drop', 'notosanstc', 'stack'],
   ['やきとり', 'YAKITORI', 'chili', 'dela', 'tategaki'],
+  ['한방 찜질', 'JJIMJIL', 'leaf', 'notoserif'],
+  ['별빛 노래방', 'KARAOKE', 'mic', 'sunflower'],
+  ['타코 하우스', 'TACO', 'chili', 'jua'],
+  ['네온 포토', 'PHOTO', 'glasses', 'bungee', 'rotate'],
 ]
 const defaultVert = (brand: string): Vert => (scriptOf(brand) === 'latin' ? 'rotate' : 'stack')
 
@@ -254,7 +273,8 @@ export const buildings: Building[] = []
 export const signs: SignData[] = []
 
 type Kind = 'H' | 'V' | 'R' | 'T'
-const PATTERNS: Kind[][] = [['H', 'V'], ['H'], ['T'], ['H', 'R'], ['V', 'H'], [], ['T', 'H'], ['H'], ['R'], ['H', 'V']]
+// every building gets a fascia sign; most also carry one or two projecting / banner signs on the façade edges
+const PATTERNS: Kind[][] = [['H', 'V'], ['H', 'T'], ['H', 'R'], ['H', 'V', 'R'], ['H'], ['H', 'T', 'V'], ['H', 'R'], ['H', 'R', 'T'], ['H', 'V']]
 
 let sid = 0
 function makeSign(kind: Kind, b: Building, zc: number, idx: number): SignData {

@@ -367,7 +367,8 @@ function drawFrame(ctx: Ctx, W: number, H: number, v: number, disc: boolean) {
  *  composition, logo style and border.
  * ------------------------------------------------------------------ */
 export function makeSignTexture(s: SignData, logoImg?: HTMLImageElement | null): { text: THREE.CanvasTexture; halo: THREE.CanvasTexture } {
-  const ppm = 300 // texels per metre: crisp lettering even when the viewer stands next to the sign
+  // texels per metre: crisp lettering up close; lower on phones to keep ~60 sign textures within GPU memory
+  const ppm = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 200 : 260
   const W = Math.max(128, Math.min(1600, Math.round(s.w * ppm)))
   const H = Math.max(128, Math.min(1800, Math.round(s.h * ppm)))
   const c = document.createElement('canvas')

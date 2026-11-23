@@ -97,6 +97,12 @@ export function Pedestrians({ count = 56 }: { count?: number }) {
 
   const { parts, mats } = useMemo(() => {
     const cyl = (rt: number, rb: number, seg = 10) => new THREE.CylinderGeometry(rt, rb, 1, seg)
+    // limb segment with rounded ends (no flat cylinder caps poking out at shoulders / hips / knees)
+    const tube = (rt: number, rb: number) =>
+      new THREE.LatheGeometry(
+        [[0, -0.5], [rb * 0.6, -0.485], [rb * 0.9, -0.44], [rb, -0.37], [rt, 0.37], [rt * 0.9, 0.44], [rt * 0.6, 0.485], [0, 0.5]].map(([r, y]) => new THREE.Vector2(r, y)),
+        14,
+      )
     const hairCap = new THREE.SphereGeometry(0.5, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6)
     hairCap.rotateX(-0.38) // rim higher at the forehead, lower at the nape
     const skirtGeo = new THREE.CylinderGeometry(0.42, 0.62, 1, 16, 1, true)
@@ -117,11 +123,11 @@ export function Pedestrians({ count = 56 }: { count?: number }) {
       { key: 'scarf', per: 1, geo: new THREE.TorusGeometry(0.5, 0.2, 8, 16), mat: 'cloth' },
       { key: 'skirt', per: 1, geo: skirtGeo, mat: 'cloth' },
       { key: 'bag', per: 1, geo: new THREE.BoxGeometry(1, 1, 1), mat: 'bag' },
-      { key: 'thigh', per: 2, geo: cyl(0.5, 0.42), mat: 'cloth' },
-      { key: 'calf', per: 2, geo: cyl(0.42, 0.32), mat: 'cloth' },
+      { key: 'thigh', per: 2, geo: tube(0.5, 0.42), mat: 'cloth' },
+      { key: 'calf', per: 2, geo: tube(0.42, 0.32), mat: 'cloth' },
       { key: 'shoe', per: 2, geo: new THREE.BoxGeometry(1, 1, 1), mat: 'shoe' },
-      { key: 'upper', per: 2, geo: cyl(0.5, 0.45), mat: 'cloth' },
-      { key: 'fore', per: 2, geo: cyl(0.45, 0.38), mat: 'cloth' },
+      { key: 'upper', per: 2, geo: tube(0.5, 0.45), mat: 'cloth' },
+      { key: 'fore', per: 2, geo: tube(0.45, 0.38), mat: 'cloth' },
       { key: 'hand', per: 2, geo: new THREE.SphereGeometry(0.5, 8, 6), mat: 'skin' },
     ]
     const mats = {
@@ -165,7 +171,7 @@ export function Pedestrians({ count = 56 }: { count?: number }) {
         hairC: new THREE.Color(pick(r, HAIR)),
         shoeC: new THREE.Color(pick(r, SHOES)),
         scarfC: r() > 0.6 ? new THREE.Color(pick(r, COATS)) : null,
-        bagType: r() > 0.38 ? pick(r, [1, 1, 2, 3, 3]) : 0,
+        bagType: r() > 0.55 ? 3 : 0, // only hand-carried shopping bags; no blocky body-mounted bags
         bagC: new THREE.Color(pick(r, BAGS)),
         hairStyle,
         skirt: !male && r() > 0.65,
@@ -451,7 +457,7 @@ function pose(p: Ped, i: number, M: Partial<Record<PartKey, THREE.InstancedMesh>
 
   // pelvis + torso (slight counter-rotation for natural gait)
   const pelvis = joint(_pelvis, root, 0, hipY + bob, 0, 0, -twist * 0.6, sway)
-  place('hips', i, pelvis, 0, 0.02 * s, 0, 0.3 * b * s, 0.2 * s, 0.2 * s)
+  hide('hips', i) // no pelvis block: it poked through the coat while walking
   const spine = joint(_spine, root, 0, hipY + bob, 0, 0.02, twist, -sway)
   // torso is placed in spine space: its centre sits between bottomY and topY
   place('torso', i, spine, 0, (bottomY + topY) / 2 - hipY, 0, 0.4 * b * s * (p.coat === 1 ? 1.12 : 1), torsoH, 0.26 * b * s * (p.coat === 1 ? 1.2 : 1))
@@ -498,9 +504,7 @@ function pose(p: Ped, i: number, M: Partial<Record<PartKey, THREE.InstancedMesh>
       }
     }
   }
-  if (p.bagType === 1) place('bag', i, spine, 0.2 * b * s, 0.04 * s, 0.0, 0.07 * s, 0.21 * s, 0.27 * s)
-  else if (p.bagType === 2) place('bag', i, spine, 0, topY - hipY - 0.2 * s, -0.17 * s, 0.3 * b * s, 0.4 * s, 0.14 * s)
-  else if (p.bagType === 0) hide('bag', i)
+  if (p.bagType !== 3) hide('bag', i)
 
   // neck + head (with look-around yaw)
   const neck = joint(_j, spine, 0, topY - hipY, 0, 0, p.head * 0.3)
