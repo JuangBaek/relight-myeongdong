@@ -168,7 +168,7 @@ function SignPanel() {
         <div className="flex items-center gap-2">
           <span className="inline-block w-4 h-4 border border-white/30" style={{ background: rt.hex }} />
           <span className="font-mono text-[11px]">{rt.hex.toUpperCase()}</span>
-          <span className="text-sub text-[11px]">→ {s.variant}</span>
+          <span className="text-sub text-[11px]">→ {s.variant} + MINT NEON RIM</span>
         </div>
       </Row>
       <Row k="WALL-MOUNTED STATUS">

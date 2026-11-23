@@ -72,7 +72,7 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, maxW: number, star
 }
 
 /** White-on-transparent artwork (name + logo). Tinted at runtime by the material colour. */
-export function makeSignTexture(s: SignData): THREE.CanvasTexture {
+export function makeSignTexture(s: SignData): { text: THREE.CanvasTexture; halo: THREE.CanvasTexture } {
   const ppm = 230
   const W = Math.max(128, Math.min(1400, Math.round(s.w * ppm)))
   const H = Math.max(128, Math.min(1600, Math.round(s.h * ppm)))
@@ -141,7 +141,22 @@ export function makeSignTexture(s: SignData): THREE.CanvasTexture {
   tex.anisotropy = 8
   tex.generateMipmaps = true
   tex.minFilter = THREE.LinearMipmapLinearFilter
-  return tex
+
+  // Soft neon halo: the same artwork blurred with shadowBlur (works on iOS Safari too, unlike ctx.filter).
+  const hc = document.createElement('canvas')
+  hc.width = W
+  hc.height = H
+  const hctx = hc.getContext('2d')!
+  const OFF = 6000
+  hctx.shadowColor = '#fff'
+  hctx.shadowOffsetX = OFF
+  for (const blur of [Math.max(10, W * 0.045), Math.max(5, W * 0.018)]) {
+    hctx.shadowBlur = blur
+    hctx.drawImage(c, -OFF, 0)
+  }
+  const halo = new THREE.CanvasTexture(hc)
+  halo.colorSpace = THREE.SRGBColorSpace
+  return { text: tex, halo }
 }
 
 let glow: THREE.CanvasTexture | null = null

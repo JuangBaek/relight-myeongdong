@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { signs, type SignData } from './layout'
 import { getGlowTexture, makeSignTexture } from './textures'
 import { targetFor, useStore } from '../store'
@@ -12,12 +13,13 @@ export const signMeshes = new Map<string, THREE.Mesh>()
 export interface Runtime {
   center: THREE.Vector3
   color: THREE.Color
-  power: number // 0..1 normalised emissive output
+  power: number // 0..1 normalised panel emissive output (shown in UI)
+  lightPower: number // 0..1 light actually cast on the street (neon keeps a soft glow)
   swing: number // 0..1 wall-mount progress
   hex: string
 }
 export const runtime = new Map<string, Runtime>(
-  signs.map((s) => [s.id, { center: new THREE.Vector3(), color: new THREE.Color(), power: 1, swing: 0, hex: s.panel0 }]),
+  signs.map((s) => [s.id, { center: new THREE.Vector3(), color: new THREE.Color(), power: 1, lightPower: 1, swing: 0, hex: s.panel0 }]),
 )
 export const E_MAX = 3.0
 
@@ -31,6 +33,29 @@ const metal = new THREE.MeshStandardMaterial({ color: '#1b1b1d', metalness: 0.8,
 const mint = new THREE.Color('#ADFFB6')
 const tmpA = new THREE.Color()
 const tmpB = new THREE.Color()
+const tmpC = new THREE.Color()
+// spill on walls/pavement/lights: one shared pale mint-white so the street doesn't turn green
+const neonTone = new THREE.Color('#E4FFE9')
+
+/** Thin neon-tube frame (single merged mesh) inset from the panel rim. */
+function makeFrameGeo(s: SignData) {
+  const inset = 0.055
+  const t = 0.034
+  if (s.shape === 'disc') return new THREE.TorusGeometry(s.w / 2 - inset, t / 2, 8, 72)
+  const hw = s.w / 2 - inset
+  const hh = s.h / 2 - inset
+  const bar = (w: number, h: number, x: number, y: number) => {
+    const g = new THREE.BoxGeometry(w, h, t)
+    g.translate(x, y, 0)
+    return g
+  }
+  return mergeGeometries([
+    bar(hw * 2 + t, t, 0, hh),
+    bar(hw * 2 + t, t, 0, -hh),
+    bar(t, hh * 2 + t, -hw, 0),
+    bar(t, hh * 2 + t, hw, 0),
+  ])!
+}
 
 function SignView({ s }: { s: SignData }) {
   const prog = progress[s.id]
@@ -44,17 +69,29 @@ function SignView({ s }: { s: SignData }) {
   const wallGlow = useRef<THREE.Mesh>(null!)
   const groundGlow = useRef<THREE.Mesh>(null!)
 
-  const tex = useMemo(() => makeSignTexture(s), [s])
+  const texs = useMemo(() => makeSignTexture(s), [s])
+  const tex = texs.text
   const glowTex = useMemo(() => getGlowTexture(), [])
+  const frameGeo = useMemo(() => makeFrameGeo(s), [s])
+  const haloF = useRef<THREE.Mesh>(null!)
+  const haloB = useRef<THREE.Mesh>(null!)
+  const shadowF = useRef<THREE.Mesh>(null!)
+  const frameF = useRef<THREE.Mesh>(null!)
+  const frameB = useRef<THREE.Mesh>(null!)
   const mats = useMemo(
     () => ({
       panel: new THREE.MeshStandardMaterial({ color: s.panel0, emissive: s.panel0, emissiveIntensity: s.e0, roughness: 0.55, metalness: 0.1 }),
-      text: new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+      text: new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }),
+      // mint neon glow behind the lettering (additive) – only exists once improved
+      halo: new THREE.MeshBasicMaterial({ map: texs.halo, transparent: true, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }),
+      // soft relief shadow so the lettering stands off the panel instead of reading as a flat print
+      shadow: new THREE.MeshBasicMaterial({ map: texs.halo, color: '#000', transparent: true, toneMapped: false, depthWrite: false, opacity: 0, polygonOffset: true, polygonOffsetFactor: -1 }),
+      frame: new THREE.MeshBasicMaterial({ color: mint, toneMapped: false }),
       shell: new THREE.MeshBasicMaterial({ color: mint, side: THREE.BackSide, toneMapped: false }),
       wall: new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
       ground: new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
     }),
-    [s, tex, glowTex],
+    [s, tex, texs, glowTex],
   )
   const c0 = useMemo(() => new THREE.Color(s.panel0), [s])
   const c1 = useMemo(() => new THREE.Color(s.panel1), [s])
@@ -134,6 +171,24 @@ function SignView({ s }: { s: SignData }) {
       back.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
     } else back.current.visible = false
 
+    // layered lettering: shadow (relief) < halo (mint glow) < text core, plus a neon rim tube
+    const fz = pz + d / 2
+    shadowF.current.position.set(offX + 0.012, -0.016, fz + 0.0025)
+    shadowF.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
+    haloF.current.position.set(offX, 0, fz + 0.0055)
+    haloF.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
+    frameF.current.position.set(offX, 0, fz + 0.016)
+    if (s.hinge) {
+      haloB.current.visible = true
+      haloB.current.position.set(offX, 0, pz - d / 2 - 0.0055)
+      haloB.current.scale.set(s.w * 0.97, s.h * 0.97, 1)
+      frameB.current.visible = true
+      frameB.current.position.set(offX, 0, pz - d / 2 - 0.016)
+    } else {
+      haloB.current.visible = false
+      frameB.current.visible = false
+    }
+
     // bracket arm for projecting signs
     if (s.hinge) {
       arm.current.visible = true
@@ -150,11 +205,23 @@ function SignView({ s }: { s: SignData }) {
     tmpB.lerpColors(t0, t1, pc).multiplyScalar(THREE.MathUtils.lerp(1.5, 1.7, pc))
     mats.text.color.copy(tmpB)
 
+    // neon layers fade in with the improvement (colour phase)
+    mats.halo.color.copy(mint).multiplyScalar(1.5)
+    mats.halo.opacity = 0.85 * pc
+    mats.shadow.opacity = 0.5 * pc
+    mats.frame.color.copy(mint).multiplyScalar(2.6 * (0.45 + 0.55 * pc))
+    const showFrame = pc > 0.02
+    frameF.current.visible = showFrame
+    if (s.hinge) frameB.current.visible = showFrame
+    haloF.current.visible = showFrame
+    shadowF.current.visible = showFrame
+
     // runtime for lights / UI
     const power = e / E_MAX
     rt.power = power
+    rt.lightPower = THREE.MathUtils.lerp(power, 0.34, pc) // neon keeps a soft glow on the street
     rt.swing = pm
-    rt.color.copy(tmpA)
+    rt.color.lerpColors(tmpA, neonTone, pc)
     rt.hex = '#' + tmpA.getHexString()
     // world-space panel centre (pushed slightly toward the street)
     const cx = g.position.x + Math.cos(yaw) * offX * sc
@@ -162,17 +229,19 @@ function SignView({ s }: { s: SignData }) {
     rt.center.set(cx + s.dir * 0.6, y, cz)
 
     // spill light on façade + pavement (follows emission)
-    const spill = THREE.MathUtils.lerp(1, 0.14, pc) * (e > 0 ? 1 : 0)
+    const spill = THREE.MathUtils.lerp(1, 0.3, pc)
     const wg = wallGlow.current
     wg.position.set(s.wallX + s.dir * 0.3, y, cz)
     const wsize = Math.max(s.w, s.h) * sc * 1.5 + 2.2
     wg.scale.set(wsize * (s.type === 'FASCIA' ? 1.5 : 1), wsize, 1)
-    mats.wall.color.copy(tmpA).multiplyScalar(0.9)
+    // wall/pavement spill shifts from the sign's old saturated colour to one shared mint-white tone
+    tmpC.lerpColors(tmpA, neonTone, pc)
+    mats.wall.color.copy(tmpC).multiplyScalar(0.9)
     mats.wall.opacity = 0.5 * spill
     const gg = groundGlow.current
     gg.position.set(s.wallX + s.dir * 1.7, 0.05, cz)
     gg.scale.set(6.5, 6.5, 1)
-    mats.ground.color.copy(tmpA).multiplyScalar(0.8)
+    mats.ground.color.copy(tmpC).multiplyScalar(0.8)
     mats.ground.opacity = 0.28 * spill
   })
 
@@ -183,6 +252,11 @@ function SignView({ s }: { s: SignData }) {
         <mesh ref={shell} geometry={geo} material={mats.shell} visible={false} raycast={() => null} />
         <mesh ref={front} geometry={textGeo} material={mats.text} raycast={() => null} />
         <mesh ref={back} geometry={textGeo} material={mats.text} rotation={[0, Math.PI, 0]} raycast={() => null} />
+        <mesh ref={shadowF} geometry={textGeo} material={mats.shadow} raycast={() => null} />
+        <mesh ref={haloF} geometry={textGeo} material={mats.halo} raycast={() => null} />
+        <mesh ref={haloB} geometry={textGeo} material={mats.halo} rotation={[0, Math.PI, 0]} raycast={() => null} />
+        <mesh ref={frameF} geometry={frameGeo} material={mats.frame} raycast={() => null} />
+        <mesh ref={frameB} geometry={frameGeo} material={mats.frame} rotation={[0, Math.PI, 0]} raycast={() => null} />
         <mesh ref={arm} material={metal} raycast={() => null}>
           <boxGeometry args={[1, 1, 1]} />
         </mesh>

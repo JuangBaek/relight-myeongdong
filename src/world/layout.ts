@@ -131,14 +131,13 @@ const NEON: [string, string, string][] = [
 ]
 
 // Unified post-improvement palette (charcoal / dark grey / warm grey / ivory / white)
+// Dark panels so the lit lettering + mint neon rim read as light, not as a printed image.
 const AFTER: { panel: string; text: string; e: number; name: string }[] = [
-  { panel: '#252525', text: '#E8E3D8', e: 0.1, name: 'CHARCOAL' },
-  { panel: '#252525', text: '#F2F2F2', e: 0.1, name: 'CHARCOAL' },
-  { panel: '#424242', text: '#E8E3D8', e: 0.1, name: 'DARK GREY' },
-  { panel: '#252525', text: '#E8E3D8', e: 0.1, name: 'CHARCOAL' },
-  { panel: '#E8E3D8', text: '#252525', e: 0.14, name: 'IVORY' },
-  { panel: '#424242', text: '#F2F2F2', e: 0.1, name: 'DARK GREY' },
-  { panel: '#A8A39B', text: '#252525', e: 0.12, name: 'WARM GREY' },
+  { panel: '#252525', text: '#F2F2F2', e: 0.12, name: 'CHARCOAL' },
+  { panel: '#252525', text: '#E8E3D8', e: 0.12, name: 'CHARCOAL' },
+  { panel: '#424242', text: '#F2F2F2', e: 0.14, name: 'DARK GREY' },
+  { panel: '#252525', text: '#E8E3D8', e: 0.12, name: 'CHARCOAL' },
+  { panel: '#424242', text: '#E8E3D8', e: 0.14, name: 'DARK GREY' },
 ]
 
 const WALLS = ['#cfc8bd', '#b9b2a6', '#8c8379', '#d9d4c9', '#7a5a4a', '#5b5f66', '#a39384', '#e0dccf', '#9a8f86', '#6f7378']

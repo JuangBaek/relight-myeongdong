@@ -56,7 +56,7 @@ export function Lighting() {
 
     hemi.current.intensity = 0.4 + 0.55 * f // calmer, more even ambient as the street resolves
     lampGlowMat.opacity = 0.16 + 0.34 * f
-    if (bloom.current) bloom.current.intensity = THREE.MathUtils.lerp(1.15, 0.5, f) // less glare
+    if (bloom.current) bloom.current.intensity = THREE.MathUtils.lerp(1.15, 0.85, f) // less glare, but neon keeps its glow
 
     // nearest-N signs drive real point lights
     const c = cands.current
@@ -68,7 +68,7 @@ export function Lighting() {
       const rt = runtime.get(c[i].id)!
       l.position.copy(rt.center)
       l.color.copy(rt.color)
-      l.intensity = THREE.MathUtils.lerp(l.intensity, 34 * rt.power * rt.power + 1.2, 0.2)
+      l.intensity = THREE.MathUtils.lerp(l.intensity, 34 * rt.lightPower * rt.lightPower + 1.2, 0.2)
     }
   })
 
